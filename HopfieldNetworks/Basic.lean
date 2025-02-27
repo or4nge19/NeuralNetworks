@@ -33,14 +33,26 @@ inductive SpinState : Type
   | down : SpinState
   deriving DecidableEq, Inhabited, Fintype
 
+-- Alternative definition using Multiplicative (see file `Basic_alt` ):
+structure SpinState' where
+  val : Fin 2
+  prop : val ≠ 0
+
+ @[inherit_doc SpinState]
+ def SpinState'.toReal (s : SpinState') : ℝ := if s.val = 1 then 1 else -1
+
+instance : Fintype SpinState' where
+  elems := { ⟨1, by norm_num⟩ }
+  complete s := by cases s; simp [Fin.ext_iff]; omega
+
+instance : Inhabited SpinState' := ⟨⟨1, by simp⟩⟩
+
 namespace SpinState
 
 /--
 Map `SpinState` to real numbers: `up ↦ 1`, `down ↦ -1`.
 -/
-def toReal : SpinState → ℝ
-  | up => 1
-  | down => -1
+def toReal (s : SpinState) : ℝ := if s = up then 1 else -1
 
 /--
 `SpinState` forms a commutative group under multiplication,
@@ -115,16 +127,15 @@ def spinStateEquivBool : SpinState ≃ Bool :=
   right_inv := ofBool_toBool }
 
 /-- Equivalence between `SpinState` and `ZMod 2`. -/
-def spinStateEquivZmod2 : SpinState ≃ ZMod 2 :=
-{ toFun := fun s => match s with | up => 0 | down => 1
-  invFun := fun z => if z = 0 then up else down
+def spinStateEquivZmod2 : SpinState ≃ ZMod 2 where
+  toFun := fun s => match s with | up => 1 | down => 0
+  invFun := fun z => if z = 1 then up else down
   left_inv := by intro z; cases z <;> simp
   right_inv := by
     intro z
     fin_cases z
-    · simp [SpinState.up]
     · simp [SpinState.down]
-}
+    · simp [SpinState.up]
 
 end SpinState
 
