@@ -246,6 +246,12 @@ noncomputable def energy' (net : HopfieldNetwork n) (x : HopfieldState n) : ℝ 
   let B := Matrix.toBilin' W;
   -0.5 * B xVec xVec - (fun i => net.thresholds i) ⬝ᵥ xVec
 
+lemma energy_eq_energy' (net : HopfieldNetwork n) (x : HopfieldState n) : energy net x = energy' net x := by
+  let xVec := toRealVector x
+  let W := weightsMatrix net
+  let B := Matrix.toBilin' W
+  rfl
+
 /--
 Local field (net input) for neuron `i` in state `x`,
 `(Wx)_i - threshold[i]`.
@@ -259,13 +265,11 @@ according to the sign of the local field.
 If the local field is zero, no change is made.
 -/
 noncomputable def updateState (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n) : HopfieldState n :=
-  fun j =>
-    if j = i then
-      let lf := localField net x i
-      if 0 < lf then SpinState.up
-      else if lf < 0 then SpinState.down
-      else x i
-    else x j
+  Function.update x i $
+    let lf := localField net x i
+    if 0 < lf then SpinState.up
+    else if lf < 0 then SpinState.down
+    else x i
 
 /--
 `UpdateSeq net x` is an inductive type representing a sequence of
