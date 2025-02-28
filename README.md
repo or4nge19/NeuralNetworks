@@ -32,6 +32,3 @@ Contributions are welcome! If you have any improvements or new features to add, 
 
 This project is licensed under the Apache License.
 
----
-
-Feel free to customize this README as needed to better fit your project's specifics.
