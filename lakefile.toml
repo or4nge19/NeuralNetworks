@@ -1,5 +1,5 @@
 name = "Project"
-defaultTargets = ["HopfieldNetworks"]
+defaultTargets = ["NeuralNetworks"]
 
 [leanOptions]
 pp.unicode.fun = true

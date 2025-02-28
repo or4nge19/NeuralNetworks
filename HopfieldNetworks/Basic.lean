@@ -33,20 +33,6 @@ inductive SpinState : Type
   | down : SpinState
   deriving DecidableEq, Inhabited, Fintype
 
--- Alternative definition using Multiplicative (see file `Basic_alt` ):
-structure SpinState' where
-  val : Fin 2
-  prop : val ≠ 0
-
- @[inherit_doc SpinState]
- def SpinState'.toReal (s : SpinState') : ℝ := if s.val = 1 then 1 else -1
-
-instance : Fintype SpinState' where
-  elems := { ⟨1, by norm_num⟩ }
-  complete s := by cases s; simp [Fin.ext_iff]; omega
-
-instance : Inhabited SpinState' := ⟨⟨1, by simp⟩⟩
-
 namespace SpinState
 
 /--
