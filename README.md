@@ -30,7 +30,7 @@ Contributions are welcome! If you have any improvements or new features to add, 
 
 ### License
 
-This project is licensed under the MIT License.
+This project is licensed under the Apache License.
 
 ---
 
