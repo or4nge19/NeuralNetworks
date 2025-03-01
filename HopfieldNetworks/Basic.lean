@@ -61,33 +61,6 @@ instance : CommGroup SpinState where
     cases a <;> cases b <;> rfl
   inv_mul_cancel := by intro a; cases a <;> rfl
 
-@[simp]
-lemma mul : up * up = up := rfl
-@[simp]
-lemma mul_up_down : up * down = down := rfl
-@[simp]
-lemma mul_down_up : down * up = down := rfl
-@[simp]
-lemma mul_down_down : down * down = up := rfl
-@[simp]
-lemma one : (1 : SpinState) = up := rfl
-@[simp]
-lemma inv_up : up⁻¹ = up := rfl
-@[simp]
-lemma mul_assoc (a b c : SpinState) : a * b * c = a * (b * c) := by
-  cases a <;> cases b <;> cases c <;> rfl
-@[simp]
-lemma one_mul (a : SpinState) : 1 * a = a := by
-  cases a <;> rfl
-@[simp]
-lemma mul_one (a : SpinState) : a * 1 = a := by cases a <;> rfl
-@[simp]
-lemma mul_comm (a b : SpinState) : a * b = b * a := by
-  cases a <;> cases b <;> rfl
-@[simp]
-lemma inv_mul_cancel (a : SpinState) : a⁻¹ * a = 1 := by cases a <;> rfl
-
-
 /--
 Interpret `up` as `true` and `down` as `false`.
 -/
