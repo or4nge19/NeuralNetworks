@@ -61,6 +61,33 @@ instance : CommGroup SpinState where
     cases a <;> cases b <;> rfl
   inv_mul_cancel := by intro a; cases a <;> rfl
 
+@[simp]
+lemma mul : up * up = up := rfl
+@[simp]
+lemma mul_up_down : up * down = down := rfl
+@[simp]
+lemma mul_down_up : down * up = down := rfl
+@[simp]
+lemma mul_down_down : down * down = up := rfl
+@[simp]
+lemma one : (1 : SpinState) = up := rfl
+@[simp]
+lemma inv_up : up⁻¹ = up := rfl
+@[simp]
+lemma mul_assoc (a b c : SpinState) : a * b * c = a * (b * c) := by
+  cases a <;> cases b <;> cases c <;> rfl
+@[simp]
+lemma one_mul (a : SpinState) : 1 * a = a := by
+  cases a <;> rfl
+@[simp]
+lemma mul_one (a : SpinState) : a * 1 = a := by cases a <;> rfl
+@[simp]
+lemma mul_comm (a b : SpinState) : a * b = b * a := by
+  cases a <;> cases b <;> rfl
+@[simp]
+lemma inv_mul_cancel (a : SpinState) : a⁻¹ * a = 1 := by cases a <;> rfl
+
+
 /--
 Interpret `up` as `true` and `down` as `false`.
 -/
@@ -94,6 +121,18 @@ lemma up_down_diff : up.toReal - down.toReal = 2 := by
 lemma down_up_diff : down.toReal - up.toReal = -2 := by
   simp [toReal]; norm_num
 
+@[simp]
+lemma mul_toBool (s₁ s₂ : SpinState) : (s₁ * s₂).toBool = (s₁.toBool = s₂.toBool) := by
+  cases s₁ <;> cases s₂
+  · -- up.up case
+    simp [toBool]
+  · -- up.down case
+    simp [toBool]
+  · -- down.up case
+    simp [toBool]
+  · -- down.down case
+    simp [toBool]
+
 /--
 If two spin states have the same real value, they must be equal.
 -/
@@ -116,7 +155,7 @@ def spinStateEquivBool : SpinState ≃ Bool :=
 def spinStateEquivZmod2 : SpinState ≃ ZMod 2 where
   toFun := fun s => match s with | up => 1 | down => 0
   invFun := fun z => if z = 1 then up else down
-  left_inv := by intro z; cases z <;> simp
+  left_inv := by intro s; cases s <;> simp
   right_inv := by
     intro z
     fin_cases z
@@ -132,13 +171,15 @@ def HopfieldState (n : ℕ) := Fin n → SpinState
 
 namespace HopfieldState
 
+open SpinState
+
 variable {n : ℕ}
 
 /--
 We endow `HopfieldState n` with the Hamming distance as a `MetricSpace`.
 `dist x y` is the number of coordinates in which `x` and `y` differ.
 -/
-noncomputable instance : MetricSpace (HopfieldState n) where
+instance : MetricSpace (HopfieldState n) where
   dist := fun x y => (Finset.card {i | x i ≠ y i} : ℝ)
   dist_self := by simp [Finset.card_eq_zero]
   dist_comm := by
@@ -231,18 +272,25 @@ lemma weights_diag_zero (net : HopfieldNetwork n) :
 Energy function of the Hopfield network for a given state `x`.
 Typical Hopfield energy: `E(x) = -1/2 xᵀWx - bᵀx`.
 -/
-noncomputable def energy (net : HopfieldNetwork n) (x : HopfieldState n) : ℝ :=
+def energy (net : HopfieldNetwork n) (x : HopfieldState n) : ℝ :=
   let xVec := toRealVector x;
   let W := weightsMatrix net;
   let B := Matrix.toBilin' W;
   -0.5 * B xVec xVec - Finset.sum Finset.univ (fun i => net.thresholds i * xVec i)
 
-noncomputable def energy' (net : HopfieldNetwork n) (x : HopfieldState n) : ℝ :=
+/--
+Equivalent definition aimed at making the energy function more computationally friendly
+(using the vector dot product ⬝ᵥ)
+-/
+def energy' (net : HopfieldNetwork n) (x : HopfieldState n) : ℝ :=
   let xVec := toRealVector x;
   let W := weightsMatrix net;
   let B := Matrix.toBilin' W;
   -0.5 * B xVec xVec - (fun i => net.thresholds i) ⬝ᵥ xVec
 
+/--
+Proof that the two energy functions are equivalent
+-/
 lemma energy_eq_energy' (net : HopfieldNetwork n) (x : HopfieldState n) : energy net x = energy' net x := by
   let xVec := toRealVector x
   let W := weightsMatrix net
@@ -284,8 +332,6 @@ noncomputable def target {n : ℕ} {net : HopfieldNetwork n} {x : HopfieldState 
   : UpdateSeq net x → HopfieldState n
   | nil x => x
   | cons _ _ s => s.target
-
-end UpdateSeq
 
 /--
 A state `x` is a fixed point under `net` if no single-neuron update changes the state.
@@ -338,3 +384,6 @@ Convenience coercion from `ContentAddressableMemory` to its underlying `Hopfield
 instance contentAddressableMemoryToHopfieldNetwork {n : ℕ} :
     Coe (ContentAddressableMemory n) (HopfieldNetwork n) where
   coe c := c.network
+
+end UpdateSeq
+end HopfieldState
