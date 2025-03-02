@@ -23,6 +23,14 @@ open Finset BigOperators
 
 variable {n : ℕ} (net : HopfieldNetwork n) (x : HopfieldState n)
 
+/-- When updating a state at index i, the values at other indices don't change. -/
+lemma updateState_ne {i j : Fin n} (h : i ≠ j) : (updateState net x i) j = x j := by
+  simp [updateState, Function.update_apply]
+  intro h'
+  exfalso
+  subst h'
+  exact h rfl
+
 /--
 Helper function to compute the change in energy when updating neuron `i`.
 -/
@@ -76,48 +84,188 @@ lemma energyDiff_eq (i : Fin n) :
           rw [h2]
           exact mul_eq_mul_left_iff.mp rfl
       rw [h1]
-    _ = -0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x') (toRealVector x') + 0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x) (toRealVector x) - net.thresholds i * (x' i).toReal + net.thresholds i * (x i).toReal := by simp only [neg_mul, mem_univ, sum_erase_eq_sub]; ring_nf; sorry
+    _ = -0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x') (toRealVector x') + 0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x) (toRealVector x) - net.thresholds i * (x' i).toReal + net.thresholds i * (x i).toReal := by
+      have h_sum1 : ∑ j, net.thresholds j * (toRealVector x' j) =
+                   net.thresholds i * (toRealVector x' i) + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (toRealVector x' j) := by
+        simp only [Finset.sum_erase_eq_sub, mem_univ]
+        ring
+
+      have h_sum2 : ∑ j, net.thresholds j * (toRealVector x j) =
+                   net.thresholds i * (toRealVector x i) + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (toRealVector x j) := by
+        simp only [Finset.sum_erase_eq_sub, mem_univ]
+        ring
+
+      rw [@toBilin'_apply']
+      simp only [neg_mul, mem_univ, sum_erase_eq_sub]
+
+      have : ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x' j).toReal =
+             ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x j).toReal := by
+        apply Finset.sum_congr
+        · rfl
+        · intro j hj
+          have : x' j = x j := by
+            apply updateState_ne
+            exact Ne.symm (ne_of_mem_erase hj)
+          simp [this]
+
+      -- Simplify the expressions directly rather than using rw
+      rw [@toBilin'_apply', @Fin.sum_univ_def]
+
+      -- Use algebraic manipulation to simplify the expression
+      calc
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+            net.thresholds i * (x' i).toReal +
+          net.thresholds i * (x i).toReal -
+        ((∑ j : Fin n, net.thresholds j * (x' j).toReal) - net.thresholds i * (x' i).toReal) +
+      ((∑ j : Fin n, net.thresholds j * (x j).toReal) - net.thresholds i * (x i).toReal) := by simp only [add_left_inj, sub_right_inj, sub_left_inj]; ring_nf; exact
+        rfl
+
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+            net.thresholds i * (x' i).toReal +
+          net.thresholds i * (x i).toReal -
+        (∑ j : Fin n, net.thresholds j * (x' j).toReal) + net.thresholds i * (x' i).toReal +
+        (∑ j : Fin n, net.thresholds j * (x j).toReal) - net.thresholds i * (x i).toReal := by ring
+
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+        (∑ j : Fin n, net.thresholds j * (x' j).toReal) +
+        (∑ j : Fin n, net.thresholds j * (x j).toReal) := by ring
+
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+            (net.thresholds i * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x' j).toReal) +
+            (net.thresholds i * (x i).toReal + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x j).toReal) := by
+              have h_sum1' : ∑ j : Fin n, net.thresholds j * (x' j).toReal =
+                net.thresholds i * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x' j).toReal := by
+                  simp only [mem_univ, sum_erase_eq_sub, add_sub_cancel]
+
+              have h_sum2' : ∑ j : Fin n, net.thresholds j * (x j).toReal =
+                net.thresholds i * (x i).toReal + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x j).toReal := by
+                  simp only [mem_univ, sum_erase_eq_sub, add_sub_cancel]
+
+              simp only [h_sum1', h_sum2']
+
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+            net.thresholds i * (x' i).toReal - ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x' j).toReal +
+            net.thresholds i * (x i).toReal + ∑ j ∈ Finset.univ.erase i, net.thresholds j * (x j).toReal := by ring
+
+        _ = -(0.5 * x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector) +
+              0.5 * x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector -
+            net.thresholds i * (x' i).toReal + net.thresholds i * (x i).toReal := by
+              rw [this]; ring
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - net.thresholds i * (x' i).toReal + net.thresholds i * (x i).toReal := by
       simp
       have h_bil : -0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x') (toRealVector x') = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) := by
-        rw [Matrix.toBilin'_apply]
-        exact?
+        have : Matrix.toBilin' (weightsMatrix net) (toRealVector x') (toRealVector x') = (toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x')) := by
+          dsimp only
+          exact toBilin'_apply' (weightsMatrix net) x'.toRealVector x'.toRealVector
+        rw [this]
 
       have h_bil2 : 0.5 * Matrix.toBilin' (weightsMatrix net) (toRealVector x) (toRealVector x) = 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) := by
-        rw [Matrix.toBilin'_apply]
-        exact?
-      rw [h_bil, h_bil2]
-      ring_nf
+        have : Matrix.toBilin' (weightsMatrix net) (toRealVector x) (toRealVector x) = (toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x)) := by
+          dsimp only
+          exact toBilin'_apply' (weightsMatrix net) x.toRealVector x.toRealVector
+        rw [this]
+      rw [h_bil2]
+      rw [@toBilin'_apply']
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - (localField net x i + ((weightsMatrix net) *ᵥ (toRealVector x)) i) * (x' i).toReal + (localField net x i + ((weightsMatrix net) *ᵥ (toRealVector x)) i) * (x i).toReal := by
       simp [localField, Matrix.mulVec]
-      have h_field : net.thresholds i = localField net x i + ((weightsMatrix net) *ᵥ (toRealVector x)) i - ((weightsMatrix net) *ᵥ (toRealVector x)) i := by
+      have h_field : net.thresholds i = -localField net x i + ((weightsMatrix net) *ᵥ (toRealVector x)) i := by
         simp [localField]
-        rw [add_sub_cancel]
       rw [h_field]
+
+      -- Use algebraic manipulation to prove the equality directly
+      have : (weightsMatrix net *ᵥ x.toRealVector) i = (fun j ↦ weightsMatrix net i j) ⬝ᵥ x.toRealVector := by
+        simp [Matrix.mulVec]
+
+      -- Rewrite the expression with our substitution
+      rw [this]
+
+      -- Use ring tactic to prove algebraic equality
       ring_nf
+
+      -- The expressions should now be equal by definition
+      -- Use `conv` to restructure the expression into the expected form
+      conv =>
+        congr
+        rfl
+        congr
+        rfl
+        congr
+        rfl
+        congr
+        rfl
+
+      -- Directly prove the equality with the expected grouping of terms
+      calc
+        x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector * (-1 / 2) +
+            x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector * (1 / 2) +
+          localField net x i * (x' i).toReal +
+        (-(localField net x i * (x i).toReal) - (fun j ↦ weightsMatrix net i j) ⬝ᵥ x.toRealVector * (x' i).toReal) +
+      (fun j ↦ weightsMatrix net i j) ⬝ᵥ x.toRealVector * (x i).toReal
+      =
+        x'.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x'.toRealVector * (-1 / 2) +
+            x.toRealVector ⬝ᵥ weightsMatrix net *ᵥ x.toRealVector * (1 / 2) +
+          (-localField net x i * (x' i).toReal + localField net x i * (x i).toReal) +
+        (-(fun j ↦ weightsMatrix net i j) ⬝ᵥ x.toRealVector * (x' i).toReal + (fun j ↦ weightsMatrix net i j) ⬝ᵥ x.toRealVector * (x i).toReal) := by
+        -- Use ring to prove the algebraic equality directly
+          ring_nf
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - (localField net x i * (x' i).toReal + ((weightsMatrix net *ᵥ toRealVector x) i) * (x' i).toReal) + (localField net x i * (x i).toReal + ((weightsMatrix net *ᵥ toRealVector x) i) * (x i).toReal) := by ring
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ((weightsMatrix net *ᵥ toRealVector x) i) * (x' i).toReal + ((weightsMatrix net *ᵥ toRealVector x) i) * (x i).toReal := by ring
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j, (weightsMatrix net j i) * toRealVector x j * (x' i).toReal + ∑ j, (weightsMatrix net j i) * toRealVector x j * (x i).toReal := by
       simp only [Matrix.mulVec, PiLp.innerProductSpace]
+
+      -- Expand the dot product using matrix definitions
+      have h_dot_product : (fun j => weightsMatrix net i j) ⬝ᵥ x.toRealVector = ∑ j, weightsMatrix net i j * (x j).toReal := by
+        exact rfl
+
+      have h_mulVec_i : (weightsMatrix net *ᵥ x.toRealVector) i = ∑ j, weightsMatrix net i j * (x j).toReal := by
+        simp [Matrix.mulVec]; exact h_dot_product
+
+      have h_field : localField net x i = -net.thresholds i + ((weightsMatrix net) *ᵥ (toRealVector x)) i := by
+        simp [localField]
+        ring
+
+      have h_sym_sum : ∑ j, weightsMatrix net j i * (x j).toReal = ∑ j, weightsMatrix net i j * (x j).toReal := by
+        apply Finset.sum_congr
+        · exact rfl
+        · intros j _
+          -- Use the weights_symmetric property directly
+          have h_sym := weights_symmetric net
+          -- Access matrix elements directly
+          have : weightsMatrix net j i = weightsMatrix net i j := by
+            -- For a symmetric matrix A, A j i = A i j
+            exact (Matrix.IsSymm.apply h_sym j i).symm
+          exact congrFun (congrArg HMul.hMul this) (x j).toReal
+
+
+      -- Apply our transformations
+      rw [h_dot_product]
+      rw [h_field]
+      rw [← h_sym_sum]
+      simp only [neg_mul, toRealVector_apply]
       ring_nf
-      simp only [one_div, toRealVector_apply]
       exact rfl
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (toRealVector x j) * (x' i).toReal - (weightsMatrix net i i) * (toRealVector x i) * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (toRealVector x j) * (x i).toReal + (weightsMatrix net i i) * (toRealVector x i) * (x i).toReal := by
       simp only [neg_mul, toRealVector_apply, mem_univ, sum_erase_eq_sub]
       ring
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (toRealVector x j) * (x' i).toReal - 0 + ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (toRealVector x j) * (x i).toReal + 0 := by
-      simp [weights_diag_zero]
+      simp only [weights_diag_zero]
+      have h_zero : (weightsMatrix net i i) = 0 := weights_diag_zero net i
+      simp only [h_zero, mul_zero, zero_mul, add_zero, sub_zero]
       ring_nf
-      exact rfl
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * toRealVector x j * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * toRealVector x j * (x i).toReal := by ring
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (x j).toReal * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, (weightsMatrix net j i) * (x j).toReal * (x i).toReal := by simp
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j ∈ Finset.univ.erase i, (weightsMatrix net i j) * (x j).toReal * (x' i).toReal + ∑ j ∈ Finset.univ.erase i, (weightsMatrix net i j) * (x j).toReal * (x i).toReal := by
-      have h1 : ∀ (i j : Fin n), weightsMatrix net j i = weightsMatrix net i j := by
-        intro i j
-        have h2 := weights_symmetric net
-        simp at h2
-        exact rfl
-      simp [h1]
+      apply Finset.sum_congr
+      · exact rfl
+      · intro j _
+        congr
+        have h_sym := (weights_symmetric net).prop
+        exact h_sym j i
     _ = -0.5 * ((toRealVector x') ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x'))) + 0.5 * ((toRealVector x) ⬝ᵥ ((weightsMatrix net) *ᵥ (toRealVector x))) - localField net x i * (x' i).toReal + localField net x i * (x i).toReal - ∑ j , (weightsMatrix net i j) * (x j).toReal * (x' i).toReal + (weightsMatrix net i i) * (x i).toReal * (x' i).toReal + ∑ j , (weightsMatrix net i j) * (x j).toReal * (x i).toReal - (weightsMatrix net i i) * (x i).toReal * (x i).toReal := by
       simp only [neg_mul, mem_univ, sum_erase_eq_sub]
       ring
