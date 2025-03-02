@@ -472,3 +472,168 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
         -- With zero thresholds, the expressions are equal
         rw [h_threshold_zero] at h_local_field_def ⊢
         simp at h_local_field_def ⊢
+
+/--
+  Helper theorem: When the local field and spin state have inconsistent signs,
+  flipping the spin decreases the energy.
+-/
+/-
+Proves that the energy of a Hopfield network decreases when updating a neuron
+with inconsistent signs between its state and local field.
+
+Given:
+* `net` - A Hopfield network with n neurons
+* `x` - Current state of the network
+* `i` - Index of the neuron to update
+* `h_threshold_zero` - Assumption that threshold at index i is zero
+* `h_inconsistent` - Assumption that current state and local field have inconsistent signs
+
+The proof shows that updating neuron i decreases the network's energy by considering two cases:
+1. When local field is positive: the neuron must be in down state (-1) and flips to up state (1)
+2. When local field is negative: the neuron must be in up state (1) and flips to down state (-1)
+
+In both cases, the energy difference is proven to be negative, confirming that
+the update reduces the network's overall energy.
+-/
+lemma energy_decreases_on_update_with_inconsistent_signs
+    (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
+    (h_threshold_zero : net.thresholds i = 0)
+    (h_inconsistent : (x i).toReal * localField net x i < 0) :
+    energy net (updateState net x i) < energy net x := by
+  let x' := updateState net x i
+  let lf := localField net x i
+
+  have h_diff_j : ∀ j : Fin n, j ≠ i → x' j = x j :=
+    fun j hj => Function.update_of_ne hj _ _
+
+  have h_energy_diff := energy_diff_single_flip net x i h_threshold_zero x' h_diff_j
+
+  have h_lf_nonzero : lf ≠ 0 := by
+    intro h_zero
+    have : (x i).toReal * 0 < 0 := by rw [← h_zero]; exact lt_of_lt_of_eq h_inconsistent (id (Eq.symm h_zero))
+    simp at this
+
+  by_cases h_pos : 0 < lf
+  · -- Case: local field is positive
+    -- By the inconsistency condition, x i must be down (-1)
+    have h_x_is_down : x i = SpinState.down := by
+        cases h : x i with
+        | down => rfl
+        | up =>
+          have h_up_real : (x i).toReal = 1 := by rw [h]; rfl
+
+          have h_lf_neg : lf < 0 := by
+            rw [h_up_real] at h_inconsistent
+            rw [one_mul] at h_inconsistent
+            exact h_inconsistent
+
+          -- This contradicts h_pos : 0 < lf
+          exact absurd h_lf_neg (not_lt_of_gt h_pos)
+
+    have h_x'_is_up : x' i = SpinState.up := by
+      change updateState net x i i = SpinState.up
+      unfold updateState
+      simp
+      -- When local field is positive, we flip from down to up
+      have : lf > 0 := h_pos
+      simp [this, h_x_is_down]
+      exact h_pos
+
+    -- Calculate the energy difference directly
+    have h_diff_simplified : energy net x' - energy net x < 0 := by
+      -- Start with the energy difference formula
+      rw [h_energy_diff]
+
+      -- Substitute the values for up and down states
+      have h1 : (x' i).toReal - (x i).toReal = 1 - (-1) := by
+        rw [h_x'_is_up, h_x_is_down]
+        simp [SpinState.toReal]
+
+      have h2 : 1 - (-1) = 2 := by ring
+
+      -- Simplify the expression
+      rw [h1]
+
+      -- Calculate the result directly
+      have : -(1 - (-1)) * lf = -(2 * lf) := by
+        rw [@eq_neg_iff_add_eq_zero]
+        ring_nf
+
+      -- Now we have -(2 * lf) < 0, which is true when lf > 0
+      have h3 : -(2 * lf) < 0 := by
+        suffices 2 * lf > 0 by exact neg_neg_iff_pos.mpr this
+        apply mul_pos
+        · norm_num
+        · exact h_pos
+
+      -- Apply our calculation
+      rw [this]
+
+      -- We need to show -(2 * lf) < 0
+      exact h3
+
+    -- Complete the proof for this case
+    exact sub_neg.mp h_diff_simplified
+
+  · -- Case: local field is negative or zero
+    push_neg at h_pos
+    have h_neg : lf < 0 := by
+      apply lt_of_le_of_ne
+      · exact h_pos
+      · exact h_lf_nonzero
+
+    -- By the inconsistency condition, x i must be up (1)
+    have h_x_is_up : x i = SpinState.up := by
+      cases h : x i with
+      | up => rfl
+      | down =>
+        have h_down_real : (x i).toReal = -1 := by rw [h]; rfl
+        -- When x i is down (-1) and lf < 0, their product is positive
+        have h_prod_pos : (x i).toReal * lf > 0 := by
+          apply mul_pos_of_neg_of_neg
+          · rw [h_down_real]; norm_num
+          · exact h_neg
+        -- When x i is down (-1) and lf < 0, their product is positive,
+        -- which contradicts h_inconsistent
+        rw [h_down_real] at h_inconsistent
+        have h_contra := not_lt_of_gt h_prod_pos
+        -- Rewrite h_inconsistent to match the form needed
+        have h_inconsistent' : (x i).toReal * lf < 0 := by
+          rw [h_down_real]
+          exact h_inconsistent
+        exact False.elim (h_contra h_inconsistent')
+
+    -- The update must flip to down (-1)
+    have h_x'_is_down : x' i = SpinState.down := by
+      change updateState net x i i = SpinState.down
+      unfold updateState
+      simp
+      simp_all only [ne_eq, neg_sub, ↓reduceIte,
+        ite_eq_right_iff, reduceCtorEq, imp_false, not_lt, x', lf]
+
+    -- Calculate the energy difference directly
+    have h_diff_simplified : energy net x' - energy net x < 0 := by
+      -- Start with the energy difference formula
+      rw [h_energy_diff]
+
+      -- Substitute the values for up and down states
+      have h1 : (x' i).toReal - (x i).toReal = (-1) - 1 := by
+        rw [h_x'_is_down, h_x_is_up]
+        simp [SpinState.toReal]
+
+      have h2 : (-1) - 1 = -2 := by ring
+
+      -- Simplify the expression
+      rw [h1]
+
+      -- Distribute the negative
+      have h3 : -(-2 * lf) = 2 * lf := by ring
+      --rw [h3]
+
+      -- Now we have 2 * lf < 0, which is true when lf < 0
+      apply mul_neg_of_pos_of_neg
+      · norm_num
+      · exact h_neg
+
+    -- Complete the proof for this case
+    exact sub_neg.mp h_diff_simplified
