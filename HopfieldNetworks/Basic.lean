@@ -297,6 +297,15 @@ inductive UpdateSeq {n : ℕ} (net : HopfieldNetwork n) : HopfieldState n → Ty
   | nil : (x : HopfieldState n) → UpdateSeq net x
   | cons : (x : HopfieldState n) → (i : Fin n) → UpdateSeq net (updateState net x i) → UpdateSeq net x
 
+/--
+Defines a function to generate a specific UpdateSeq
+-/
+noncomputable
+def updateSeqOfList (net : HopfieldNetwork n) (x : HopfieldState n) (l : List (Fin n)) : HopfieldState.UpdateSeq net x :=
+     match l with
+     | [] => HopfieldState.UpdateSeq.nil x
+     | i :: is => HopfieldState.UpdateSeq.cons x i (updateSeqOfList net (updateState net x i) is)
+
 namespace UpdateSeq
 /--
 Extract the final state from an update sequence.
@@ -311,6 +320,18 @@ A state `x` is a fixed point under `net` if no single-neuron update changes the 
 -/
 def isFixedPoint {n : ℕ} (net : HopfieldNetwork n) (x : HopfieldState n) : Prop :=
   ∀ i, updateState net x i = x
+
+/--
+Decidability of fixed points.
+-/
+noncomputable
+instance {n : ℕ} {net : HopfieldNetwork n} {x : HopfieldState n} : Decidable (HopfieldState.UpdateSeq.isFixedPoint net x) :=
+  by
+  unfold HopfieldState.UpdateSeq.isFixedPoint
+  have : DecidablePred fun i => updateState net x i = x := by
+    intro i
+    exact Classical.propDecidable ((fun i ↦ updateState net x i = x) i)
+  apply Fintype.decidableForallFintype
 
 /--
 A state `x` converges to a fixed point `p` if there is an update
@@ -337,6 +358,16 @@ lemma overlap_self (x : HopfieldState n) :
     _ = ∑ i : Fin n, 1 := by simp [real_vector_sq_one x]
     _ = n := by simp
 
+lemma overlap_comm (x y : HopfieldState n) : overlap x y = overlap y x := by
+  simp [overlap, mul_comm]
+
+/- TODO :
+  -- Relate the overlap function to the Hamming distance.
+  -- Define a bounded version of convergesTo with a maximum
+     sequence length and provide decidability instance
+  -- Consider an alternative, equivalent formulation of the
+     update rule, based on a function that chooses a random neuron to update.
+-/
 /--
 `ContentAddressableMemory` wraps a `HopfieldNetwork` and a finite set of
 stored patterns with a threshold criterion guaranteeing pattern completion.
