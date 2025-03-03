@@ -1,4 +1,4 @@
-name = "Project"
+name = "NeuralNetworks"
 defaultTargets = ["NeuralNetworks"]
 
 [leanOptions]
@@ -11,4 +11,4 @@ name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4.git"
 
 [[lean_lib]]
-name = "HopfieldNetworks"
+name = "NeuralNetworks"

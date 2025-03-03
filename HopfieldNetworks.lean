@@ -1,2 +1,3 @@
 import HopfieldNetworks.Example
 import HopfieldNetworks.Basic
+import HopfieldNetworks.Energy
