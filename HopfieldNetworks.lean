@@ -1,2 +1,2 @@
-import Project.Example
-import Project.Basic
+import HopfieldNetworks.Example
+import HopfieldNetworks.Basic
