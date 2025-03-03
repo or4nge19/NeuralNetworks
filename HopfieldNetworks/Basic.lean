@@ -307,6 +307,14 @@ def updateSeqOfList (net : HopfieldNetwork n) (x : HopfieldState n) (l : List (F
      | i :: is => HopfieldState.UpdateSeq.cons x i (updateSeqOfList net (updateState net x i) is)
 
 namespace UpdateSeq
+
+/--
+Get the length of an update sequence.
+-/
+noncomputable def length {n : ℕ} {net : HopfieldNetwork n} {x : HopfieldState n} : UpdateSeq net x → ℕ
+  | nil _ => 0
+  | cons _ _ s => s.length + 1
+
 /--
 Extract the final state from an update sequence.
 -/
@@ -324,8 +332,7 @@ def isFixedPoint {n : ℕ} (net : HopfieldNetwork n) (x : HopfieldState n) : Pro
 /--
 Decidability of fixed points.
 -/
-noncomputable
-instance {n : ℕ} {net : HopfieldNetwork n} {x : HopfieldState n} : Decidable (HopfieldState.UpdateSeq.isFixedPoint net x) :=
+noncomputable instance {n : ℕ} {net : HopfieldNetwork n} {x : HopfieldState n} : Decidable (HopfieldState.UpdateSeq.isFixedPoint net x) :=
   by
   unfold HopfieldState.UpdateSeq.isFixedPoint
   have : DecidablePred fun i => updateState net x i = x := by
@@ -339,6 +346,18 @@ sequence from `x` that terminates at `p`, and `p` is a fixed point.
 -/
 def convergesTo {n : ℕ} (net : HopfieldNetwork n) (x p : HopfieldState n) : Prop :=
   ∃ (seq : UpdateSeq net x), seq.target = p ∧ isFixedPoint net p
+
+/-
+Since convergesTo is undecidable in general, we define a bounded version-/
+def convergesToBounded {n : ℕ} (net : HopfieldNetwork n) (x p : HopfieldState n) (maxSteps : ℕ) : Prop :=
+  ∃ (seq : HopfieldState.UpdateSeq net x), seq.target = p ∧ HopfieldState.UpdateSeq.isFixedPoint net p ∧
+      -- Add a condition on the length of the sequence
+      seq.length ≤ maxSteps
+
+noncomputable instance {n : ℕ} {net : HopfieldNetwork n} {x p : HopfieldState n} {maxSteps : ℕ} :
+    Decidable (convergesToBounded net x p maxSteps) := by
+  classical
+  exact inferInstance
 
 /--
 The overlap measures similarity between two states by taking
@@ -363,8 +382,7 @@ lemma overlap_comm (x y : HopfieldState n) : overlap x y = overlap y x := by
 
 /- TODO :
   -- Relate the overlap function to the Hamming distance.
-  -- Define a bounded version of convergesTo with a maximum
-     sequence length and provide decidability instance
+
   -- Consider an alternative, equivalent formulation of the
      update rule, based on a function that chooses a random neuron to update.
 -/
