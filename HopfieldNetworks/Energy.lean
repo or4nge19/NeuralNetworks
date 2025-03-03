@@ -756,3 +756,5 @@ theorem energy_monotonically_decreases {net : HopfieldNetwork n} {x : HopfieldSt
   | cons x' i seq' ih =>
     simp only [UpdateSeq.target]
     exact le_trans ih (energy_decreases_on_update net x' i (h_zero_thresholds i))
+
+end HopfieldState
