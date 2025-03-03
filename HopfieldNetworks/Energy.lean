@@ -637,3 +637,122 @@ lemma energy_decreases_on_update_with_inconsistent_signs
 
     -- Complete the proof for this case
     exact sub_neg.mp h_diff_simplified
+
+lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
+    (h_threshold_zero : net.thresholds i = 0) :
+    energy net (updateState net x i) ≤ energy net x := by
+  let lf := localField net x i
+
+  by_cases h_inconsistent : (x i).toReal * lf < 0
+  · exact le_of_lt (energy_decreases_on_update_with_inconsistent_signs net x i h_threshold_zero h_inconsistent)
+  · push_neg at h_inconsistent
+    let x' := updateState net x i
+    have h_diff_j : ∀ j : Fin n, j ≠ i → x' j = x j :=
+      fun j hj => Function.update_of_ne hj _ _
+    have h_energy_diff := energy_diff_single_flip net x i h_threshold_zero x' h_diff_j
+    by_cases h_lf_zero : lf = 0
+    · simp at h_energy_diff
+      -- When local field is zero, the energy difference is zero
+      have h_energies_equal : energy net x' = energy net x := by
+        rw [← sub_eq_zero]
+        rw [h_energy_diff]
+        simp [mul_zero]
+        rw [← h_lf_zero]
+        exact AffineMap.lineMap_eq_lineMap_iff.mp rfl
+
+      -- Since x' is the updated state
+      have h_x'_eq : x' = updateState net x i := rfl
+      rw [h_energies_equal]
+
+    · have h_same_sign : (x i).toReal = Real.sign lf := by
+        cases h_x : x i with
+        | down =>
+          have h_xi_val : (x i).toReal = -1 := by rw [h_x]; rfl
+
+          have h_lf_neg : lf < 0 := by
+            have : -1 * lf ≥ 0 := by rw [← h_xi_val]; exact h_inconsistent
+            have : lf ≤ 0 := by simpa using this
+            exact lt_of_le_of_ne this h_lf_zero
+
+          rw [← h_x]
+          rw [h_xi_val]
+          rw [← Real.sign_of_neg h_lf_neg]
+
+        | up =>
+          have h_xi_val : (x i).toReal = 1 := by rw [h_x]; rfl
+
+          have h_lf_pos : lf > 0 := by
+            have : 1 * lf ≥ 0 := by rw [← h_xi_val]; exact h_inconsistent
+            have : lf ≥ 0 := by simpa using this
+            exact lt_of_le_of_ne this (Ne.symm h_lf_zero)
+
+          rw [← h_x, h_xi_val]
+          exact Eq.symm (Real.sign_of_pos h_lf_pos)
+      have h_x'_eq_x : x' = x := by
+        ext j
+        if h : j = i then
+          subst h
+          rw [← @Function.graph_id]
+          simp [updateState, Real.sign_of_pos, Real.sign_of_neg, h_same_sign, h_lf_zero]
+          change updateState net ?_ ?_ ?_ = ?_
+          unfold updateState
+          simp
+          -- if lf > 0, then x j is up (1), and if lf < 0, then x j is down (-1)
+          have h1 : lf > 0 ∨ lf < 0 := by exact lt_or_gt_of_ne fun a ↦ h_lf_zero (id (Eq.symm a))
+          cases h1 with
+          | inl h_pos =>
+            have : x j = SpinState.up := by
+              cases h_x_j : x j with
+              | down =>
+                have h_down : (x j).toReal = -1 := by rw [h_x_j]; rfl
+                have h_lf_sign : lf.sign = 1 := Real.sign_of_pos h_pos
+                rw [h_down, h_lf_sign] at h_same_sign
+                exact eq_of_toReal_eq h_same_sign
+              | up => rfl
+            rw [this]
+            simp [h_pos]
+            exact fun a ↦ le_of_lt h_pos
+          | inr h_neg =>
+            have : x j = SpinState.down := by
+              cases h_x_j : x j with
+              | down => rfl
+              | up =>
+                have h_up : (x j).toReal = 1 := by rw [h_x_j]; rfl
+                have h_lf_sign : lf.sign = -1 := Real.sign_of_neg h_neg
+                rw [h_up, h_lf_sign] at h_same_sign
+                exact eq_of_toReal_eq h_same_sign
+            rw [this]
+            simp [h_neg]
+            exact le_of_lt h_neg
+        else
+          rw [h_diff_j j h]
+
+      -- Since x' = x and x' = updateState net x i, we have updateState net x i = x
+      rw [← h_x'_eq_x]
+      rw [h_x'_eq_x]
+      exact le_of_eq (congrArg (energy net) h_x'_eq_x)
+
+/--
+**Main theorem: Energy decreases monotonically along any asynchronous update sequence**.
+
+Given a Hopfield network with zero thresholds and a sequence of state updates,
+this theorem proves that the energy of the network monotonically decreases
+along the update sequence.
+
+This is a fundamental property of Hopfield networks that ensures convergence
+to stable states (local minima of the energy function).
+
+* `net` - The Hopfield network with n neurons
+* `x` - The initial state of the network
+* `h_zero_thresholds` - Assumption that all thresholds in the network are zero
+* `seq` - A sequence of updates applied to the initial state x
+-/
+
+theorem energy_monotonically_decreases {net : HopfieldNetwork n} {x : HopfieldState n}
+    (h_zero_thresholds : ∀ i, net.thresholds i = 0)
+    (seq : UpdateSeq net x) : energy net seq.target ≤ energy net x := by
+  induction seq with
+  | nil x' => simp [UpdateSeq.target]
+  | cons x' i seq' ih =>
+    simp only [UpdateSeq.target]
+    exact le_trans ih (energy_decreases_on_update net x' i (h_zero_thresholds i))
