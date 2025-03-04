@@ -4,11 +4,31 @@ import Mathlib.Topology.MetricSpace.Basic
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Data.Real.Sign
 import Mathlib.LinearAlgebra.Matrix.Hermitian
+import Mathlib.Analysis.Matrix
+import Mathlib.LinearAlgebra.Matrix.Spectrum
+import Mathlib.Analysis.NormedSpace.OperatorNorm.Basic
+import Mathlib.Analysis.Normed.Group.Basic
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import HopfieldNetworks.Basic
 
+section EnergyDecrease
 
+
+/-!
+  The energy function for a Hopfield network decreases monotonically with each spin update.
+
+  This theorem demonstrates that for a Hopfield network with zero thresholds:
+  1) When a spin update occurs at position `i`, the energy difference is exactly:
+     `-((x'[i] - x[i]) * localField(x, i))`
+  2) When a spin's state and its local field have inconsistent signs, flipping the spin
+     strictly decreases the network's energy
+  3) When a spin's state and local field have consistent signs, the energy remains unchanged
+  4) As a consequence, for any update sequence, the energy monotonically decreases
+
+  These results establish the fundamental convergence properties of Hopfield networks
+  and show that the energy function serves as a Lyapunov function for the dynamics.
+-/
 namespace HopfieldState
 
 open SpinState
@@ -129,8 +149,8 @@ lemma bilin_with_single_component {M : Matrix (Fin n) (Fin n) ℝ}
     apply Finset.sum_eq_single i
     · intro k _hk h_ne
       rw [h_single k h_ne, mul_zero]
-    · intro h_absurd
-      exact False.elim (h_absurd (Finset.mem_univ i))
+    · intro a
+      simp_all only [ne_eq, Finset.mem_univ, not_true_eq_false]
 
   -- Further simplify using the definition of matrix-vector multiplication
   calc Matrix.toBilin' M x δ
@@ -476,8 +496,7 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
 /--
   Helper theorem: When the local field and spin state have inconsistent signs,
   flipping the spin decreases the energy.
--/
-/-
+
 Proves that the energy of a Hopfield network decreases when updating a neuron
 with inconsistent signs between its state and local field.
 
@@ -494,6 +513,10 @@ The proof shows that updating neuron i decreases the network's energy by conside
 
 In both cases, the energy difference is proven to be negative, confirming that
 the update reduces the network's overall energy.
+
+-- TODO:
+  Remove the h_threshold_zero condition, and modify the proof
+  slightly to account for the threshold term in the energy difference
 -/
 lemma energy_decreases_on_update_with_inconsistent_signs
     (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
@@ -638,6 +661,18 @@ lemma energy_decreases_on_update_with_inconsistent_signs
     -- Complete the proof for this case
     exact sub_neg.mp h_diff_simplified
 
+/-!
+`energy_decreases_on_update` proves that the energy of a Hopfield network decreases
+(or stays the same) after updating the state of a single neuron.
+
+The proof proceeds by cases:
+1. If the sign of the local field and the neuron's state are inconsistent, then the energy decreases strictly.
+2. If the sign of the local field and the neuron's state are consistent, then we further consider two subcases:
+  a. If the local field is zero, then the energy remains the same.
+  b. If the local field is non-zero, then the neuron's state is already aligned with the local field, so updating
+  it will not change the state or the energy.
+-/
+@[simp]
 lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
     (h_threshold_zero : net.thresholds i = 0) :
     energy net (updateState net x i) ≤ energy net x := by
@@ -732,22 +767,32 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
       rw [h_x'_eq_x]
       exact le_of_eq (congrArg (energy net) h_x'_eq_x)
 
-/--
-**Main theorem: Energy decreases monotonically along any asynchronous update sequence**.
 
-Given a Hopfield network with zero thresholds and a sequence of state updates,
-this theorem proves that the energy of the network monotonically decreases
-along the update sequence.
+/-
+**Main Theorem: Energy monotonically decreases during network updates**
 
 This is a fundamental property of Hopfield networks that ensures convergence
 to stable states (local minima of the energy function).
 
-* `net` - The Hopfield network with n neurons
-* `x` - The initial state of the network
-* `h_zero_thresholds` - Assumption that all thresholds in the network are zero
-* `seq` - A sequence of updates applied to the initial state x
--/
+Inputs:
+- `net : HopfieldNetwork n`: A Hopfield network with n neurons
+- `x : HopfieldState n`: A state of the Hopfield network
+- `h_zero_thresholds`: A hypothesis that all thresholds in the network are zero
+- `seq : UpdateSeq net x`: A sequence of updates starting from state x
 
+The theorem proves that the energy of the final state after updates is less than or
+equal to the energy of the initial state.
+
+The proof proceeds by induction on the update sequence:
+- Base case: If the sequence is empty, the target state is the same as x
+- Inductive case: Uses transitivity of inequality and the fact that each individual
+  update decreases energy (from energy_decreases_on_update theorem)
+
+-- TODO:
+  Remove the h_threshold_zero condition, and modify the proof
+  slightly to account for the threshold term in the energy difference
+-/
+@[simp]
 theorem energy_monotonically_decreases {net : HopfieldNetwork n} {x : HopfieldState n}
     (h_zero_thresholds : ∀ i, net.thresholds i = 0)
     (seq : UpdateSeq net x) : energy net seq.target ≤ energy net x := by
@@ -757,4 +802,531 @@ theorem energy_monotonically_decreases {net : HopfieldNetwork n} {x : HopfieldSt
     simp only [UpdateSeq.target]
     exact le_trans ih (energy_decreases_on_update net x' i (h_zero_thresholds i))
 
-end HopfieldState
+
+/-!
+# Energy Minimality at Fixed Points
+
+This theorem proves that the energy of a Hopfield network is minimal at fixed points,
+assuming zero thresholds.  Specifically, if a state `x` is a fixed point of the network
+(i.e., updating any single spin leaves the state unchanged), and all thresholds are zero,
+then changing the state of a single spin will not decrease the energy.
+
+## Theorem Statement
+
+Given:
+- `net : HopfieldNetwork n`: A Hopfield network with `n` spins.
+- `x : HopfieldState n`: A state of the Hopfield network.
+- `h_fixed : UpdateSeq.isFixedPoint net x`: `x` is a fixed point of the network.
+- `h_zero_thresholds : ∀ (i : Fin n), net.thresholds i = 0`: All thresholds of the network are zero.
+- `y : HopfieldState n`: Another state of the Hopfield network.
+- `i : Fin n`: An index of a spin.
+- `h_diff_only_i : ∀ (j : Fin n), j ≠ i → y j = x j`: `y` differs from `x` only at index `i`.
+
+Then:
+`energy net x ≤ energy net y`: The energy of `x` is less than or equal to the energy of `y`.
+
+## Proof Strategy
+
+The proof proceeds by case analysis on the states of `x` and `y` at position `i`.
+Since each spin can be either up or down, there are four cases:
+
+1.  `x i = up, y i = up`: No change in spin, so the energy remains the same.
+2.  `x i = up, y i = down`: The spin flips from up to down. Since `x` is a fixed point,
+  the local field at `i` must be non-negative. Therefore, flipping the spin to down
+  increases the energy.
+3.  `x i = down, y i = up`: The spin flips from down to up. Since `x` is a fixed point,
+  the local field at `i` must be non-positive. Therefore, flipping the spin to up
+  increases the energy.
+4.  `x i = down, y i = down`: No change in spin, so the energy remains the same.
+
+In each case, we show that `energy net x ≤ energy net y`.
+
+## Assumptions
+
+- The thresholds of the Hopfield network are all zero. This simplifies the energy difference
+  formula and allows us to relate the sign of the local field to the spin state at a fixed point.
+-/
+@[simp]
+theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
+    (x : HopfieldState n) (h_fixed : UpdateSeq.isFixedPoint net x)
+    (h_zero_thresholds : ∀ (i : Fin n), net.thresholds i = 0)
+    (y : HopfieldState n) (i : Fin n)
+    (h_diff_only_i : ∀ (j : Fin n), j ≠ i → y j = x j) :
+    energy net x ≤ energy net y := by
+
+  -- Get the local field at position i
+  let lf := localField net x i
+
+  -- Using the fixed point property: updateState net x i = x
+  have h_update_eq_x : updateState net x i = x := by
+    exact h_fixed i
+
+  -- Apply the energy difference formula
+  have h_energy_diff : energy net y - energy net x =
+      -((y i).toReal - (x i).toReal) * lf := by
+    exact energy_diff_single_flip net x i (h_zero_thresholds i) y h_diff_only_i
+
+  -- Case analysis on the states of x and y at position i
+  by_cases h_x_up : x i = SpinState.up
+  · -- Case: x i = up
+    by_cases h_y_up : y i = SpinState.up
+    · -- Case: x i = up, y i = up
+      -- No difference in energy if they're the same at position i
+      rw [h_y_up, h_x_up] at h_energy_diff
+      simp at h_energy_diff
+
+      -- Since x is a fixed point: updateState net x i = x
+      have h_update_eq_x' : updateState net x i = x := h_update_eq_x
+
+      -- Therefore: energy net (updateState net x i) = energy net x
+      have h_energy_eq : energy net (updateState net x i) = energy net x := by
+        rw [h_update_eq_x']
+
+      -- From h_energy_diff: energy net y = energy net x
+      have h_energy_y_eq_x : energy net y = energy net x := by
+        dsimp only
+        rw [sub_eq_zero] at h_energy_diff
+        exact h_energy_diff
+
+      -- Combine the equalities to get the desired inequality
+      rw [← h_fixed i]
+      rw [h_fixed]
+      exact le_of_eq (id (Eq.symm h_energy_y_eq_x))
+    · -- Case: x i = up, y i = down
+      -- Get the real values for these states
+      have h_x_real : (x i).toReal = 1 := by
+        cases h : x i
+        case down =>
+          have h_contra : up = down := by
+            rw [← h_x_up, h]
+          simp_all only [ne_eq, neg_sub, reduceCtorEq, lf]
+        case up => rfl
+
+      -- Since y i is not up (h_y_up), it must be down
+      have h_y_down : y i = SpinState.down := by
+        have h_y_not_up : ¬ y i = SpinState.up := h_y_up
+        cases h : y i
+        case down => rfl
+        case up => contradiction
+
+      have h_y_real : (y i).toReal = -1 := by
+        rw [h_y_down]
+        rfl
+
+      -- Since x is a fixed point, the local field at i must have a sign consistent with x i
+      have h_consistent_sign : lf ≥ 0 := by
+        -- From the fixed point property, we know updateState doesn't change x i
+        unfold updateState at h_update_eq_x
+        simp at h_update_eq_x
+        -- If updateState doesn't change x i from up, then either:
+        -- 1) lf > 0 (which would set it to up), or
+        -- 2) lf = 0 (which would leave it unchanged)
+        -- In either case, lf ≥ 0
+        by_cases h_lf_pos : 0 < lf
+        · exact le_of_lt h_lf_pos
+        · push_neg at h_lf_pos
+          by_cases h_lf_neg : lf < 0
+          · -- This case is impossible: if lf < 0, updateState would flip to down
+            have h_would_update : updateState net x i i = SpinState.down := by
+              unfold updateState
+              simp [h_lf_neg]
+              simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
+                ite_eq_right_iff, imp_false, not_lt, lf]
+
+            -- The update should have flipped the spin to down
+            have h_update_down : updateState net x i i = SpinState.down := by
+              unfold updateState
+              simp [h_lf_neg]
+              rw [← h_update_eq_x]
+              rw [← h_zero_thresholds i]
+              simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
+                Function.update_self, ite_self, ite_eq_right_iff, imp_false, not_lt, lf]
+
+            -- But x i is up, so updateState net x i i ≠ x i
+            have h_neq : updateState net x i i ≠ x i := by
+              rw [h_x_up]
+              rw [h_update_down]
+              simp
+
+            -- This contradicts the assumption that x is a fixed point
+            have h_contra : updateState net x i = x := h_update_eq_x
+            have h_contra' : updateState net x i i = x i := by
+              rw [h_fixed]
+            exact False.elim (h_neq h_contra')
+
+          · -- If not lf < 0 and not 0 < lf, then lf = 0
+            push_neg at h_lf_neg
+            exact h_lf_neg
+
+      -- Substitute the real values into the energy difference
+      rw [h_x_real, h_y_real] at h_energy_diff
+      -- Simplify: -(-1 - 1) * lf = -((-2) * lf) = 2 * lf
+      have h_diff_simplified : energy net y - energy net x = 2 * lf := by
+        simp at h_energy_diff
+        rw [h_energy_diff]
+        ring
+
+      -- Since lf ≥ 0 and we have 2 * lf, the difference is non-negative
+      have h_energy_y_ge_x : energy net y - energy net x ≥ 0 := by
+        rw [h_diff_simplified]
+        exact mul_nonneg (by norm_num) h_consistent_sign
+
+      -- Therefore, energy net x ≤ energy net y
+      exact le_of_sub_nonneg h_energy_y_ge_x
+
+  · -- Case: x i = down (not up)
+    have h_x_down : x i = SpinState.down := by
+      have h_x_not_up : ¬ x i = SpinState.up := h_x_up
+      cases h : x i
+      case down => rfl
+      case up => contradiction
+
+    by_cases h_y_up : y i = SpinState.up
+    · -- Case: x i = down, y i = up
+      -- Similar reasoning as the previous case
+      have h_x_real : (x i).toReal = -1 := by rw [h_x_down]; rfl
+      have h_y_real : (y i).toReal = 1 := by rw [h_y_up]; rfl
+
+      -- Since x is a fixed point, the local field must have consistent sign with x i
+      have h_consistent_sign : lf ≤ 0 := by
+        -- If x i stays down at a fixed point, then either:
+        -- 1) lf < 0 (which would set it to down), or
+        -- 2) lf = 0 (which would leave it unchanged)
+        unfold updateState at h_update_eq_x
+        simp at h_update_eq_x
+        by_cases h_lf_neg : lf < 0
+        · exact le_of_lt h_lf_neg
+        · push_neg at h_lf_neg
+          by_cases h_lf_pos : 0 < lf
+          · -- This case is impossible: if lf > 0, updateState would flip to up
+            have h_would_update : updateState net x i i = SpinState.up := by
+              unfold updateState
+              simp [h_lf_pos]
+              have h_contra : localField net x i ≤ 0 → False := by
+                intro h
+                exact not_le_of_gt h_lf_pos h
+              intro a
+              simp_all only [ne_eq, ite_self, up_down_diff, neg_mul, reduceCtorEq, not_false_eq_true,
+                not_true_eq_false, lf]
+
+
+            -- But we know x is a fixed point, so updateState net x i = x
+            have h_contra : updateState net x i i = x i := by
+              rw [h_fixed i]
+
+            -- And we know x i = down
+            rw [h_x_down] at h_contra
+
+            -- This contradicts h_would_update
+            have h_neq : SpinState.up ≠ SpinState.down := by simp
+            rw [h_would_update] at h_contra
+            exact False.elim (h_neq h_contra)
+
+          · -- If not lf < 0 and not 0 < lf, then lf = 0
+            push_neg at h_lf_pos
+            exact h_lf_pos
+
+      -- Substitute the real values into the energy difference
+      rw [h_x_real, h_y_real] at h_energy_diff
+      -- Simplify: -(1 - (-1)) * lf = -2 * lf
+      have h_diff_simplified : energy net y - energy net x = -2 * lf := by
+        simp at h_energy_diff
+        rw [h_energy_diff]
+        ring
+
+      -- Since lf ≤ 0 and we have -2 * lf, the difference is non-negative
+      have h_energy_y_ge_x : energy net y - energy net x ≥ 0 := by
+        rw [h_diff_simplified]
+        simp only [neg_mul, ge_iff_le, Left.nonneg_neg_iff]
+        rw [@mul_nonpos_iff]
+        rw [← h_zero_thresholds i] at h_consistent_sign
+        rw [h_zero_thresholds] at h_consistent_sign
+        constructor
+        . norm_num
+          simp_all only [ne_eq, neg_mul, sub_neg_eq_add, neg_add_rev, reduceCtorEq, not_false_eq_true, lf]
+
+      -- Therefore, energy net x ≤ energy net y
+      exact le_of_sub_nonneg h_energy_y_ge_x
+
+    · -- Case: x i = down, y i = down
+      -- No difference in energy if they're the same at position i
+      have h_y_down : y i = SpinState.down := by
+        cases h_y : y i
+        case up =>
+          contradiction
+        case down =>
+          rfl
+
+      rw [h_y_down, h_x_down] at h_energy_diff
+      simp at h_energy_diff
+
+      -- Since the energy difference is zero
+      have h_energy_equal : energy net y = energy net x := by
+        rw [sub_eq_zero] at h_energy_diff
+        exact h_energy_diff
+
+      -- Use the fixed point property
+      rw [← h_update_eq_x]
+
+      -- Since energy net y = energy net x and x is a fixed point
+      rw [h_energy_equal]
+      rw [← h_fixed i]
+      exact energy_decreases_on_update net (updateState net x i) i (h_zero_thresholds i)
+
+section EnergyDecrease
+
+open HopfieldState
+
+variable {n : ℕ} (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
+
+/--
+Energy difference between the updated state at index `i` and the original state.
+`energy (updateState net x i) - energy x`.
+-/
+noncomputable def energyDiff (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n) : ℝ :=
+  energy net (updateState net x i) - energy net x
+
+lemma energyDiff_eq_spinDiff_localField (h_zero_thresholds : ∀ i, net.thresholds i = 0):
+    energyDiff net x i = -((updateState net x i i).toReal - (x i).toReal) * localField net x i := by
+  unfold energyDiff
+  let x' := updateState net x i
+  have h_diff_j : ∀ j : Fin n, j ≠ i → x' j = x j :=
+    fun j hj => Function.update_of_ne hj _ _
+  have h_energy_diff := energy_diff_single_flip net x i (h_zero_thresholds i) x' h_diff_j
+  exact h_energy_diff
+
+-- should be easy from the proved theorems
+lemma energy_decreasing (h_zero_thresholds : ∀ i, net.thresholds i = 0): energyDiff net x i ≤ 0 := by
+  unfold energyDiff
+  rw [sub_nonpos]
+  apply energy_decreases_on_update
+  apply h_zero_thresholds
+
+-- should be easy from the proved lemmas and theorems
+lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
+    (h_zero_thresholds : ∀ i, net.thresholds i = 0):
+  updateState net x i ≠ x → localField net x i ≠ 0 → energyDiff net x i < 0 := by
+  intro h_update_ne h_lf_ne
+  have h_inconsistent : (x i).toReal * localField net x i < 0 := by
+    cases h_x : x i with
+    | up =>
+      have h_xi_real : (x i).toReal = 1 := by rw [h_x]; rfl
+      have h_update_down : updateState net x i = Function.update x i SpinState.down := by
+        unfold updateState
+        simp [h_lf_ne]
+        by_cases h_pos : 0 < localField net x i
+        · exfalso
+          -- When local field is positive and state is up, updateState preserves the state
+          have h_update_up : updateState net x i = x := by
+            ext j
+            by_cases h_j : j = i
+            · rw [h_j]
+              unfold updateState
+              simp [h_pos]
+              rw [h_x]
+            · exact Function.update_of_ne h_j _ _
+          exact h_update_ne h_update_up
+        · have h_neg : localField net x i < 0 := by
+            push_neg at h_pos
+            exact lt_of_le_of_ne h_pos h_lf_ne
+          simp [h_neg]
+          rw [← h_zero_thresholds i]
+          -- Show that the condition is false, so we get down
+          have h_cond : ¬(net.thresholds i < localField net x i) := by
+            rw [h_zero_thresholds i]
+            simp
+            exact le_of_lt h_neg
+          simp [h_cond]
+      have h_lf_neg : localField net x i < 0 := by
+        by_cases h_pos : 0 < localField net x i
+        · -- If local field is positive, updateState would preserve up state
+          have h_preserve : updateState net x i i = SpinState.up := by
+            unfold updateState
+            simp [h_pos]
+          rw [h_update_down] at h_update_ne
+          rw [← h_zero_thresholds i]
+          simp_all only [ne_eq, Function.update_self, reduceCtorEq]
+        · -- Since local field is not positive and not zero (h_lf_ne),
+          -- it must be negative
+          push_neg at h_pos
+          exact lt_of_le_of_ne h_pos h_lf_ne
+      simp_all only [ne_eq, one_mul]
+    | down =>
+      have h_xi_real : (x i).toReal = -1 := by rw [h_x]; rfl
+      have h_update_up : updateState net x i = Function.update x i SpinState.up := by
+        unfold updateState
+        simp
+
+      -- Since updateState changes the state (h_update_ne) and x i is down,
+      -- we must have localField net x i > 0
+        have h_lf_pos : 0 < localField net x i := by
+          by_cases h_pos : 0 < localField net x i
+          · exact h_pos
+          · push_neg at h_pos
+            by_cases h_neg : localField net x i < 0
+            · -- If local field is negative, updateState would keep it down
+              have h_stays_down : updateState net x i = x := by
+                ext j
+                by_cases h_j : j = i
+                · rw [h_j]
+                  unfold updateState
+                  simp [h_neg]
+                  rw [h_x]
+                  rw [← h_zero_thresholds i]
+                  rw [← h_j]
+                  subst h_j
+                  simp_all only [ne_eq, ite_eq_right_iff, reduceCtorEq, imp_false, not_lt]
+                · exact Function.update_of_ne h_j _ _
+              contradiction
+            · -- If not positive and not negative, must be zero
+              push_neg at h_neg
+              have h_zero : localField net x i = 0 := by
+                exact le_antisymm h_pos h_neg
+              contradiction
+
+        -- When local field is positive, updateState flips to up
+        simp_all only [ne_eq, ↓reduceIte]
+      have h_lf_pos : localField net x i > 0 := by
+        have h_update_ne' : updateState net x i i ≠ x i := by
+          unfold updateState at h_update_ne
+          simp at h_update_ne
+          have h_eq : updateState net x i i = Function.update x i (if 0 < localField net x i then up else if localField net x i < 0 then down else x i) i := by
+            rfl
+          rw [h_eq]
+          intro h_absurd
+          apply h_update_ne
+          ext j
+          by_cases h_j : j = i
+          · rw [h_j, Function.update_self]
+            rw [h_x]
+            simp
+            by_cases h_pos : 0 < localField net x i
+            · rw [← h_zero_thresholds i]
+              subst h_j
+              simp_all only [↓reduceIte, ne_eq, Function.update_self, reduceCtorEq]
+            · rw [← h_zero_thresholds i]
+              subst h_j
+              simp_all only [↓reduceIte, ite_self, ne_eq, Function.update_self, reduceCtorEq]
+          · rw [Function.update_of_ne h_j]
+        have h_update_up' : updateState net x i i = SpinState.up := by
+          unfold updateState
+          simp
+
+          rw [← h_x]
+          simp
+          by_cases h_lf_neg : localField net x i < 0
+          · intro h_le
+            exfalso
+            -- Local field is both less than zero and less than or equal to zero
+            have h_contra := lt_of_le_of_ne h_le h_lf_ne
+            have h_not_lf_neg : ¬(localField net x i < 0) := by
+              have h_pos : 0 < localField net x i := by
+                push_neg at h_lf_neg
+                -- Since local field is not negative (h_lf_neg) and not zero (h_lf_ne),
+                -- it must be positive
+                -- This is a contradiction because we already know the field is negative
+                exfalso
+                -- We have both:
+                -- h_lf_neg : localField net x i < 0
+                -- h_update_ne : updateState net x i ≠ x
+                -- For a down state with negative field, updateState should not change it
+                have h_no_update : updateState net x i = x := by
+                  ext j
+                  by_cases h_j : j = i
+                  · rw [h_j]
+                    unfold updateState
+                    simp [h_lf_neg]
+                    rw [h_x]
+                    subst h_j
+                    simp_all only [ne_eq, Function.update_self, reduceCtorEq, not_false_eq_true, ite_eq_right_iff,
+                      imp_false, not_lt]
+                  · exact Function.update_of_ne h_j _ _
+                exact h_update_ne h_no_update
+              exact not_lt_of_gt h_pos
+            exact h_not_lf_neg h_lf_neg
+          rw [h_x]
+          simp
+          -- Since we've eliminated the negative case, and the local field is not zero (h_lf_ne),
+          -- it must be positive
+          push_neg at h_lf_neg
+          exact lt_of_le_of_ne h_lf_neg (id (Ne.symm h_lf_ne))
+        rw [h_x] at h_update_ne'
+        rw [h_update_up'] at h_update_ne'
+        simp at h_update_ne'
+
+        -- Since the updateState changes the state from down to up,
+        -- the local field must be positive
+        by_cases h_pos : 0 < localField net x i
+        · exact h_pos
+        · push_neg at h_pos
+          have h_no_change : updateState net x i i = x i := by
+            unfold updateState
+            simp
+            rw [h_x]
+            by_cases h_neg : localField net x i < 0
+            · rw [← h_zero_thresholds i]
+              simp_all only [ne_eq, ↓reduceIte, ite_eq_right_iff, reduceCtorEq, imp_false, not_lt]
+            · push_neg at h_neg
+              have h_zero : localField net x i = 0 := by
+                exact le_antisymm h_pos h_neg
+              simp [h_zero]
+          rw [← h_zero_thresholds i]
+          simp_all only [ne_eq, reduceCtorEq]
+
+      exact mul_neg_of_neg_of_pos (by exact neg_one_lt_zero) h_lf_pos
+  unfold energyDiff
+  rw [sub_neg]
+  exact
+    energy_decreases_on_update_with_inconsistent_signs net x i (h_zero_thresholds i) h_inconsistent
+
+-- should be easy from the proved lemmas and theorems
+lemma energy_fixed_point_iff_no_change (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
+    (h_zero_thresholds : ∀ i, net.thresholds i = 0) :
+  energyDiff net x i = 0 ↔ updateState net x i = x := by
+  constructor
+  · -- (⟹) If energy doesn't change, the state doesn't change
+    intro h_energy_eq
+    unfold energyDiff at h_energy_eq
+    dsimp only
+
+    by_cases h_update_eq : updateState net x i = x
+    · -- If already equal, we're done
+      exact h_update_eq
+    · -- If not equal, we get a contradiction with h_energy_eq
+      have h_lf_nonzero : localField net x i ≠ 0 := by
+        -- Proof that if update changes the state, local field must be nonzero
+        intro h_lf_zero
+        have h_update_same : updateState net x i = x := by
+          -- Show that if local field is zero, update doesn't change state
+          ext j
+          by_cases h_j : j = i
+          · -- For position i
+            subst h_j
+            unfold updateState
+            simp [h_lf_zero]
+          · -- For positions j ≠ i
+            exact Function.update_of_ne h_j _ _
+        contradiction  -- Contradicts h_update_eq
+
+      have h_energy_decrease : energy net (updateState net x i) < energy net x := by
+        have h_energy_diff_neg : energyDiff net x i < 0 := by
+          apply energy_strictly_decreasing_if_state_changes_and_localField_nonzero net x i h_zero_thresholds
+          · exact h_update_eq  -- State changes
+          · exact h_lf_nonzero  -- Local field is nonzero
+        -- Convert from energyDiff to energy difference
+        unfold energyDiff at h_energy_diff_neg
+        exact sub_neg.mp h_energy_diff_neg
+
+      -- This contradicts our assumption that energy doesn't change
+      have h_contradiction : energy net (updateState net x i) ≠ energy net x := by
+        exact ne_of_lt h_energy_decrease
+
+      --simp_all only [ne_eq]
+      linarith  -- Contradicts h_energy_eq
+
+  · -- (⟸) If state doesn't change, energy doesn't change
+    intro h_update_eq
+    unfold energyDiff
+    rw [← h_zero_thresholds i]
+    rw [h_update_eq]
+    simp_all only [sub_self]
