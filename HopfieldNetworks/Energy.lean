@@ -1,15 +1,3 @@
-import Mathlib.LinearAlgebra.QuadraticForm.Basic
-import Mathlib.LinearAlgebra.Matrix.BilinearForm
-import Mathlib.Topology.MetricSpace.Basic
-import Mathlib.Data.Fin.VecNotation
-import Mathlib.Data.Real.Sign
-import Mathlib.LinearAlgebra.Matrix.Hermitian
-import Mathlib.Analysis.Matrix
-import Mathlib.LinearAlgebra.Matrix.Spectrum
-import Mathlib.Analysis.NormedSpace.OperatorNorm.Basic
-import Mathlib.Analysis.Normed.Group.Basic
-import Mathlib.Tactic
-import Mathlib.Data.ZMod.Basic
 import HopfieldNetworks.Basic
 
 section EnergyDecrease
@@ -771,8 +759,8 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
 /-
 **Main Theorem: Energy monotonically decreases during network updates**
 
-This is a fundamental property of Hopfield networks that ensures convergence
-to stable states (local minima of the energy function).
+This theorem establishes that the energy of a Hopfield network monotonically decreases
+during a sequence of state updates, when all thresholds are zero.
 
 Inputs:
 - `net : HopfieldNetwork n`: A Hopfield network with n neurons
@@ -789,7 +777,7 @@ The proof proceeds by induction on the update sequence:
   update decreases energy (from energy_decreases_on_update theorem)
 
 -- TODO:
-  Remove the h_threshold_zero condition, and modify the proof
+  More general formulation: Remove the h_threshold_zero condition, and modify the proof
   slightly to account for the threshold term in the energy difference
 -/
 @[simp]
@@ -1086,6 +1074,7 @@ Energy difference between the updated state at index `i` and the original state.
 noncomputable def energyDiff (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n) : ℝ :=
   energy net (updateState net x i) - energy net x
 
+-- The energy difference is non-positive when the local field is zero
 lemma energyDiff_eq_spinDiff_localField (h_zero_thresholds : ∀ i, net.thresholds i = 0):
     energyDiff net x i = -((updateState net x i i).toReal - (x i).toReal) * localField net x i := by
   unfold energyDiff
@@ -1095,14 +1084,14 @@ lemma energyDiff_eq_spinDiff_localField (h_zero_thresholds : ∀ i, net.threshol
   have h_energy_diff := energy_diff_single_flip net x i (h_zero_thresholds i) x' h_diff_j
   exact h_energy_diff
 
--- should be easy from the proved theorems
+-- The energy difference is non-positive when the local field is zero
 lemma energy_decreasing (h_zero_thresholds : ∀ i, net.thresholds i = 0): energyDiff net x i ≤ 0 := by
   unfold energyDiff
   rw [sub_nonpos]
   apply energy_decreases_on_update
   apply h_zero_thresholds
 
--- should be easy from the proved lemmas and theorems
+-- The energy difference is strictly negative when the state changes and the local field is non-zero
 lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
     (h_zero_thresholds : ∀ i, net.thresholds i = 0):
   updateState net x i ≠ x → localField net x i ≠ 0 → energyDiff net x i < 0 := by
@@ -1279,7 +1268,7 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
   exact
     energy_decreases_on_update_with_inconsistent_signs net x i (h_zero_thresholds i) h_inconsistent
 
--- should be easy from the proved lemmas and theorems
+-- The energy difference is zero if the state doesn't change
 lemma energy_fixed_point_iff_no_change (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
     (h_zero_thresholds : ∀ i, net.thresholds i = 0) :
   energyDiff net x i = 0 ↔ updateState net x i = x := by
