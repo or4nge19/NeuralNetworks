@@ -1,14 +1,7 @@
-import Mathlib.LinearAlgebra.QuadraticForm.Basic
 import Mathlib.LinearAlgebra.Matrix.BilinearForm
-import Mathlib.Topology.MetricSpace.Basic
-import Mathlib.Data.Fin.VecNotation
-import Mathlib.Data.Real.Sign
 import Mathlib.LinearAlgebra.Matrix.Hermitian
-import Mathlib.Tactic
-import Mathlib.Data.ZMod.Basic
+import Mathlib.LinearAlgebra.QuadraticForm.Basic
 
-set_option maxHeartbeats 0
-set_option maxRecDepth 10000
 
 /-!
 # Hopfield Networks Formalization
@@ -109,7 +102,6 @@ lemma mul_toBool (s₁ s₂ : SpinState) : (s₁ * s₂).toBool = (s₁.toBool =
 /--
 If two spin states have the same real value, they must be equal.
 -/
-@[simp]
 lemma eq_of_toReal_eq {s₁ s₂ : SpinState} (h : s₁.toReal = s₂.toReal) : s₁ = s₂ := by
   cases s₁ <;> cases s₂ <;> try rfl
   all_goals {
@@ -145,6 +137,12 @@ def HopfieldState (n : ℕ) := Fin n → SpinState
 namespace HopfieldState
 
 open SpinState
+
+@[ext]
+lemma hopfieldState_ext {x y : HopfieldState n} (h : ∀ i, x i = y i) : x = y := funext h
+
+instance {n : ℕ} : DecidableEq (HopfieldState n) :=
+  fun x y => decidable_of_iff (∀ i, x i = y i) ⟨hopfieldState_ext, fun h i => by rw [h]⟩
 
 variable {n : ℕ}
 
@@ -210,10 +208,6 @@ def toRealVector (x : HopfieldState n) : Fin n → ℝ :=
 lemma toRealVector_apply (x : HopfieldState n) (i : Fin n) :
   x.toRealVector i = (x i).toReal := rfl
 
-@[ext]
-lemma hopfieldState_ext {x y : HopfieldState n} (h : ∀ i, x i = y i) : x = y := funext h
-
-
 /--
 `HopfieldNetwork` consists of:
 1. A real-valued weight matrix `weights` of size `n × n`, which is Hermitian (symmetric in ℝ)
@@ -221,7 +215,9 @@ lemma hopfieldState_ext {x y : HopfieldState n} (h : ∀ i, x i = y i) : x = y :
 2. A threshold vector `thresholds` with one real value per neuron.
 -/
 structure HopfieldNetwork (n : ℕ) : Type where
+  /-- The weight matrix specifying connection strengths between neurons. It is symmetric with zero diagonal. -/
   weights : {M : Matrix (Fin n) (Fin n) ℝ // M.IsHermitian ∧ Matrix.diag M = 0}
+  /-- The threshold (bias) vector, with one real value per neuron. -/
   thresholds : Fin n → ℝ
 
 /--
@@ -348,12 +344,19 @@ def convergesTo {n : ℕ} (net : HopfieldNetwork n) (x p : HopfieldState n) : Pr
   ∃ (seq : UpdateSeq net x), seq.target = p ∧ isFixedPoint net p
 
 /-
-Since convergesTo is undecidable in general, we define a bounded version-/
+Since convergesTo is undecidable in general, we define a bounded
+version of convergence that limits the number of update steps.
+A state `x` converges to a fixed point `p` within `maxSteps` steps if there is an update
+sequence from `x` that terminates at `p`, `p` is a fixed point, and the sequence length
+is at most `maxSteps`.
+-/
 def convergesToBounded {n : ℕ} (net : HopfieldNetwork n) (x p : HopfieldState n) (maxSteps : ℕ) : Prop :=
   ∃ (seq : HopfieldState.UpdateSeq net x), seq.target = p ∧ HopfieldState.UpdateSeq.isFixedPoint net p ∧
       -- Add a condition on the length of the sequence
       seq.length ≤ maxSteps
-
+/-
+Decidability of bounded convergence
+-/
 noncomputable instance {n : ℕ} {net : HopfieldNetwork n} {x p : HopfieldState n} {maxSteps : ℕ} :
     Decidable (convergesToBounded net x p maxSteps) := by
   classical
@@ -377,22 +380,64 @@ lemma overlap_self (x : HopfieldState n) :
     _ = ∑ i : Fin n, 1 := by simp [real_vector_sq_one x]
     _ = n := by simp
 
+/-
+The overlap function is symmetric.
+-/
 lemma overlap_comm (x y : HopfieldState n) : overlap x y = overlap y x := by
   simp [overlap, mul_comm]
 
-/- TODO :
-  -- Relate the overlap function to the Hamming distance.
-
-  -- Consider an alternative, equivalent formulation of the
-     update rule, based on a function that chooses a random neuron to update.
+/-
+The overlap function is related to the Hamming distance.
 -/
+lemma overlap_and_distance {n : ℕ} (x y : HopfieldState n) :
+  overlap x y = (n : ℝ) - 2 * dist x y := by
+  rw [overlap, dist]
+  have h : ∀ i, (x i).toReal * (y i).toReal = 1 - 2 * if x i ≠ y i then 1 else 0 := by
+    intro i
+    cases x i <;> cases y i <;> simp [SpinState.toReal] <;> norm_num
+  simp_rw [h]
+  rw [Finset.sum_sub_distrib]
+  simp [Finset.card_univ]
+  rw [@Fin.sum_univ_def]
+  rw [@List.sum_map_ite]
+  simp only [List.map_const', List.sum_replicate, smul_zero, decide_not, nsmul_eq_mul, zero_add]
+  norm_cast
+  ring_nf
+  have : (List.filter (fun a => !decide (x a = y a)) (List.finRange n)).length =
+         (Finset.filter (fun i => x i ≠ y i) Finset.univ).card := by
+    simp only [ne_eq]
+    congr
+    ext i
+    simp only [List.mem_filter, List.mem_finRange, Fin.val_eq_val, true_and]
+    simp only [decide_not]
+  rw [this]
+  simp [PseudoMetricSpace.toDist]
+  exact rfl
+
+/--
+A type representing a selection function that chooses which neuron to update next.
+-/
+def NeuronSelector (n : ℕ) := HopfieldState n → Option (Fin n)
+
+/--
+A random update rule that uses a selector to choose which neuron to update.
+Returns None if no update is needed or possible.
+-/
+noncomputable def randomUpdate {n : ℕ} (net : HopfieldNetwork n) (selector : NeuronSelector n)
+    (x : HopfieldState n) : Option (HopfieldState n) := do
+  let i ← selector x
+  let x' := updateState net x i
+  if x' = x then none else some x'
 /--
 `ContentAddressableMemory` wraps a `HopfieldNetwork` and a finite set of
 stored patterns with a threshold criterion guaranteeing pattern completion.
 -/
 structure ContentAddressableMemory (n : ℕ) : Type where
+  /-- The underlying Hopfield network used for pattern storage and recall. -/
   network : HopfieldNetwork n
+  /-- The set of stored patterns that can be recalled. -/
   patterns : Finset (HopfieldState n)
+  /-- The overlap threshold required for pattern completion. -/
   threshold : ℝ
   completes :
     ∀ p ∈ patterns, ∀ x : HopfieldState n,
