@@ -2,6 +2,8 @@ import Mathlib.LinearAlgebra.Matrix.BilinearForm
 import Mathlib.LinearAlgebra.Matrix.Hermitian
 import Mathlib.LinearAlgebra.QuadraticForm.Basic
 
+variable {n : ℕ}
+
 
 /-!
 # Hopfield Networks Formalization
