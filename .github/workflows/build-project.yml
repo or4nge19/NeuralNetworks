@@ -1,4 +1,4 @@
-name: Build NeuralNetworks
+name: Build Project
 
 on:
   push:
@@ -55,4 +55,4 @@ jobs:
           restore-keys: LakeBuild-
 
       - name: Build project
-        run: ~/.elan/bin/lake build NeuralNetworks
+        run: ~/.elan/bin/lake build project

@@ -36,7 +36,7 @@ def rename_directory(old_name, new_name):
     if os.path.exists(old_name):
         os.rename(old_name, new_name)
 
-def main(project_name):
+def main(NeuralNetworks):
     """
     Perform all the customization steps for the template.
 
@@ -52,21 +52,21 @@ def main(project_name):
     build_project_yml = '.github/workflows/build-project.yml'
 
     # Replace 'Project' with the actual project name in the necessary files
-    replace_text_in_file(lakefile_toml, 'Project', project_name)
-    replace_text_in_file(docbuild_lakefile_toml, 'Project', project_name)
-    replace_text_in_file(build_project_yml, 'Project', project_name)
+    replace_text_in_file(lakefile_toml, 'Project', NeuralNetworks)
+    replace_text_in_file(docbuild_lakefile_toml, 'Project', NeuralNetworks)
+    replace_text_in_file(build_project_yml, 'Project', NeuralNetworks)
 
     # Rename 'Project' folder to match the project name
-    rename_directory(project_folder, project_name)
+    rename_directory(project_folder, NeuralNetworks)
 
     # Notify the user to customize 'CONTRIBUTING.md' manually
     print(f"Please customize {contributing_md} manually to set up the contribution guidelines for your project.")
 
     # Rename 'Project.lean' to match the project name and update imports
     if os.path.exists(project_lean):
-        new_project_lean = f"{project_name}.lean"
+        new_project_lean = f"{NeuralNetworks}.lean"
         os.rename(project_lean, new_project_lean)
-        replace_text_in_file(new_project_lean, 'Project', project_name)
+        replace_text_in_file(new_project_lean, 'Project', NeuralNetworks)
 
 if __name__ == "__main__":
     # Check if the script is executed with the correct number of command-line arguments

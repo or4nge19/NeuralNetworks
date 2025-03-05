@@ -1,4 +1,8 @@
-import HopfieldNetworks.Basic
+import Mathlib.Algebra.Azumaya.Basic
+import Mathlib.Algebra.Lie.OfAssociative
+import Mathlib.Data.Real.Sign
+import Mathlib.Data.Real.StarOrdered
+import NeuralNetworks.Hopfield.Basic
 
 section EnergyDecrease
 
