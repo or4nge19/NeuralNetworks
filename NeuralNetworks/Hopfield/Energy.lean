@@ -1079,6 +1079,7 @@ noncomputable def energyDiff (net : HopfieldNetwork n) (x : HopfieldState n) (i 
   energy net (updateState net x i) - energy net x
 
 -- The energy difference is non-positive when the local field is zero
+@[simp]
 lemma energyDiff_eq_spinDiff_localField (h_zero_thresholds : ∀ i, net.thresholds i = 0):
     energyDiff net x i = -((updateState net x i i).toReal - (x i).toReal) * localField net x i := by
   unfold energyDiff
@@ -1089,6 +1090,7 @@ lemma energyDiff_eq_spinDiff_localField (h_zero_thresholds : ∀ i, net.threshol
   exact h_energy_diff
 
 -- The energy difference is non-positive when the local field is zero
+@[simp]
 lemma energy_decreasing (h_zero_thresholds : ∀ i, net.thresholds i = 0): energyDiff net x i ≤ 0 := by
   unfold energyDiff
   rw [sub_nonpos]
@@ -1096,6 +1098,7 @@ lemma energy_decreasing (h_zero_thresholds : ∀ i, net.thresholds i = 0): energ
   apply h_zero_thresholds
 
 -- The energy difference is strictly negative when the state changes and the local field is non-zero
+@[simp]
 lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
     (h_zero_thresholds : ∀ i, net.thresholds i = 0):
   updateState net x i ≠ x → localField net x i ≠ 0 → energyDiff net x i < 0 := by
@@ -1273,6 +1276,7 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
     energy_decreases_on_update_with_inconsistent_signs net x i (h_zero_thresholds i) h_inconsistent
 
 -- The energy difference is zero if the state doesn't change
+@[simp]
 lemma energy_fixed_point_iff_no_change (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
     (h_zero_thresholds : ∀ i, net.thresholds i = 0) :
   energyDiff net x i = 0 ↔ updateState net x i = x := by

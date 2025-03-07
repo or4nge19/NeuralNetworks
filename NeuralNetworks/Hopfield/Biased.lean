@@ -1,4 +1,4 @@
-import HopfieldNetworks.Basic
+import NeuralNetworks.Hopfield.Basic
 
 section BiasedHopfieldNetwork
 open HopfieldState
