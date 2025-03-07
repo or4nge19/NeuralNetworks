@@ -1,4 +1,7 @@
-import HopfieldNetworks.Basic
+
+import NeuralNetworks.Hopfield.Basic
+
+/-
 
 section SimulationAndAnalysis
 
@@ -61,3 +64,5 @@ def hebbian_net_example : HopfieldNetwork 4 := hebbianNetwork patterns_example
 -- 3. Connect to empirical data and design simulation experiments.
 -- 4. Investigate more complex network architectures and learning rules.
 -- 5. Formalize and analyze network properties using Lean's theorem prover.
+
+-/
