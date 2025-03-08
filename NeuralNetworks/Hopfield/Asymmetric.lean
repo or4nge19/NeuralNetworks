@@ -29,8 +29,6 @@ The implementation is based on the decomposition of asymmetric weight matrices i
 * A positive definite symmetric component S
 * A non-negative diagonal constraint
 
-This decomposition is crucial for analyzing network dynamics and convergence properties.
-
 ## References
 
 TODO
