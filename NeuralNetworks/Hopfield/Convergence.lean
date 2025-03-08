@@ -81,13 +81,31 @@ instance fintype_SpinState : Fintype SpinState :=
 instance finite_HopfieldState {n : ℕ} : Finite (HopfieldState n) :=
   Pi.finite
 
---instance fintype_HopfieldState {n : ℕ} : Fintype (HopfieldState n) :=
-noncomputable
-instance fintype_HopfieldState {n : ℕ} : Fintype (HopfieldState n) :=
+noncomputable instance fintype_HopfieldState {n : ℕ} : Fintype (HopfieldState n) :=
   Fintype.ofFinite (HopfieldState n)
 
-/--
-Energy strictly decreases if we actually flip the i-th spin.
+
+/-!
+  `energy_strict_decrease` proves that the energy of a Hopfield network strictly decreases
+  when the state is updated at a specific neuron `i`, given that the update changes the state,
+  all thresholds are zero, and the local field at neuron `i` is non-zero.
+
+  Assumptions:
+  - `net : HopfieldNetwork n`: The Hopfield network under consideration.
+  - `x : HopfieldState n`: The current state of the network.
+  - `i : Fin n`: The index of the neuron being updated.
+  - `h_threshold_zero : ∀ j, net.thresholds j = 0`: All thresholds of the network are zero.
+  - `h_not_fixed : updateState net x i ≠ x`: Updating the state at neuron `i` changes the state.
+
+  The proof proceeds by showing that the difference in energy between the updated state and the
+  current state is equal to the energy difference at neuron `i` (energyDiff net x i).
+  It then suffices to show that this energy difference is negative.
+
+  The proof uses `energy_strictly_decreasing_if_state_changes_and_localField_nonzero` to show that
+  the energy strictly decreases if the state changes and the local field is non-zero.
+  The condition that the state changes is given by `h_not_fixed`.
+  The condition that the local field is non-zero is proven by contradiction: assuming the local field
+  is zero leads to the conclusion that the update does not change the state, contradicting `h_not_fixed`.
 -/
 lemma energy_strict_decrease {n : ℕ} (net : HopfieldNetwork n)
     (x : HopfieldState n) (i : Fin n)
@@ -115,16 +133,47 @@ lemma energy_strict_decrease {n : ℕ} (net : HopfieldNetwork n)
       simp [hj]
   exact h_lf_ne_zero
 
+/--
+Defines an order based on the energy difference between two states.
+`energy_order net x y` is true if the energy of state `x` is less than the energy of state `y` in the Hopfield network `net`.
+-/
 def energy_order (net : HopfieldNetwork n) (x y : HopfieldState n) : Prop :=
   HopfieldState.energy net x < HopfieldState.energy net y
 
+/-!
+  `state_space_finite n` proves that the state space of a Hopfield network with `n` neurons is finite.
+  It leverages the fact that `HopfieldState n` is equivalent to `Fin n → SpinState`, which represents the set of all functions from `Fin n` to `SpinState`.
+  Since both `Fin n` and `SpinState` are finite, the set of all functions between them is also finite, as shown by `Pi.finite`.
+-/
 lemma state_space_finite (n : ℕ) : Finite (HopfieldState n) := by
   have : HopfieldState n = (Fin n → SpinState) := rfl
   rw [this]
   exact Pi.finite
 
-/-
-A strictly decreasing chain in a finite set is impossible.
+/-!
+## Lemma: no_infinite_descending_chain
+
+This lemma proves that there cannot be an infinite descending chain of energy states in a Hopfield network.
+In other words, there is no infinite sequence of states where the energy strictly decreases at each step.
+
+**Arguments:**
+
+*   `net : HopfieldNetwork n`: The Hopfield network.
+
+**Returns:**
+
+*   `¬ (∃ (f : ℕ → HopfieldState n), ∀ k, energy_order net (f (k+1)) (f k))`:
+  It is not the case that there exists a function `f` from natural numbers to Hopfield states
+  such that for all `k`, the energy of the state `f (k+1)` is strictly less than the energy of the state `f k`.
+
+**Proof:**
+
+1.  **Assume** there exists an infinite descending chain `f`.
+2.  **Show** that since the state space is finite, the sequence `f` must revisit some state, i.e., there exist `i` and `j` such that `i < j` and `f i = f j`. This is done using the pigeonhole principle.
+3.  **Show** that `energy net (f j) = energy net (f i)` because `f j = f i`.
+4.  **Show** that there is a strict descent from `energy net (f i)` to `energy net (f j)` using induction on the difference between `i` and `j`.
+5.  **Contradiction**: We have both `energy net (f j) = energy net (f i)` and `energy net (f j) < energy net (f i)`, which is impossible.
+6.  **Therefore**, the initial assumption of an infinite descending chain must be false.
 -/
 lemma no_infinite_descending_chain {n : ℕ} (net : HopfieldNetwork n) :
     ¬ (∃ (f : ℕ → HopfieldState n),
@@ -262,12 +311,20 @@ def energy_wf {n : ℕ} (net : HopfieldNetwork n) : WellFounded (energy_order ne
   rw [WellFounded.wellFounded_iff_no_descending_seq]
   apply IsEmpty.mk
   intro ⟨f, hf⟩
-  apply no_infinite_descending_chain net
-  use f
+  exact no_infinite_descending_chain net ⟨f, hf⟩
 
-/--
-Main convergence theorem: from any initial state `x₀`, there is
-a finite sequence of single-neuron updates leading to a stable fixed point.
+
+/-!
+**Main Theorem**
+`convergence` proves that a Hopfield network with zero thresholds will always converge to a stable state.
+
+Given a Hopfield network `net` of size `n` and an initial state `x₀`, if all thresholds are zero,
+then there exists a stable state `y` and a path (list of indices) such that:
+1. `y` is a fixed point of the update sequence (i.e., no single neuron update changes the state).
+2. `y` can be reached from `x₀` by applying the updates in the order specified by the `path`.
+
+The proof uses well-founded induction on the energy function of the network.
+The energy function strictly decreases with each state update (given zero thresholds) until a fixed point is reached.
 -/
 theorem convergence {n : ℕ} (net : HopfieldNetwork n) (x₀ : HopfieldState n)
     (h_thresholds_zero : ∀ j, net.thresholds j = 0) :
