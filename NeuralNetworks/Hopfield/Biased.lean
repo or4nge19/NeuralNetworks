@@ -30,8 +30,7 @@ noncomputable def biasedUpdateState (net : BiasedHopfieldNetwork n) (x : Hopfiel
     else x i
 
 /--
-Energy function for `BiasedHopfieldNetwork`. We need to modify the energy function
-to account for the bias term.  The energy function should be consistent with the update rule.
+Energy function for `BiasedHopfieldNetwork`.
 A possible energy function for biased Hopfield network is:
 `E(x) = -1/2 xᵀWx - bᵀx - cᵀx`, where `c` is the bias vector.
 In our notation: `E(x) = -1/2 xᵀWx - (thresholds + bias)ᵀx`.
