@@ -2,7 +2,7 @@
 
 ## Hopfield Networks Formalization
 
-This project contains a Lean 4 formalization of Hopfield networks. Hopfield networks are a type of recurrent artificial neural network that serve as content-addressable memory systems. This repository includes implementations and proofs for various concepts and features of Hopfield networks.
+This project contains a Lean 4 formalization of Hopfield networks. Hopfield networks are a type of recurrent artificial neural network that serve as content-addressable memory systems. This repository includes comprehensive structures and proofs pertaining to Hopfield networks.
 
 ### Features
 
@@ -17,13 +17,21 @@ This project contains a Lean 4 formalization of Hopfield networks. Hopfield netw
 - **EnergyDecrease**: Proves that the energy function for a Hopfield network decreases monotonically with each spin update.
 - **DifferentUpdateRules**: Provides various update rules such as synchronous and stochastic updates.
 
+### File Overview
+
+- **NeuralNetworks/Hopfield/Basic.lean**: Defines the basic structures and functions for Hopfield networks, including `SpinState`, `HopfieldState`, `HopfieldNetwork`, energy calculation, and update rules.
+- **NeuralNetworks/Hopfield/Convergence.lean**: Proves the convergence of Hopfield networks under certain conditions, showing that starting from any initial state, a finite sequence of single-neuron updates leads to a stable fixed point.
+- **NeuralNetworks/Hopfield/Energy.lean**: Defines the energy function for Hopfield networks and proves that it decreases monotonically with each spin update.
+- **NeuralNetworks/Hopfield/Hebbian.lean**: Implements a classical Hebbian rule for constructing Hopfield networks and shows that each stored pattern is a fixed point.
+- **NeuralNetworks/Hopfield/Asymmetric.lean**: Defines asymmetric Hopfield networks and provides conditions for their convergence.
+
 ### Getting Started
 
 To use this formalization, you need to have Lean 4 installed on your system. Clone this repository and explore the `HopfieldNetworks` directory for the Lean files and their respective formalizations.
 
 ### Usage
 
-The main file for the Hopfield networks formalization is `HopfieldNetworks/Basic.lean`. It includes all the definitions, structures, and proofs related to Hopfield networks. Additionally, you can find energy-related proofs in `HopfieldNetworks/Energy.lean`, and biased network extensions in `HopfieldNetworks/Biased.lean`.
+The main file for the Hopfield networks formalization is `NeuralNetworks/Hopfield/Basic.lean`. It includes all the definitions, structures, and proofs related to Hopfield networks. Additionally, you can find detailed implementations and proofs in other files within the `NeuralNetworks/Hopfield` directory.
 
 ### Contributions
 
