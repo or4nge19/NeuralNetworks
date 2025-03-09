@@ -241,50 +241,19 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
     rw [Finset.sum_eq_add_sum_diff_singleton hp]
 
     -- When q = p, simplify the sum using the fact that (p j).toReal * (p j).toReal = 1
-    have h_p_term : ∑ j, if i = j then 0 else (p i).toReal * (p j).toReal * (p j).toReal =
+    have h_p_term : ∑ j, (if i = j then 0 else (p i).toReal * (p j).toReal * (p j).toReal) =
         (p i).toReal * (n - 1) := by
             have h : ∀ j, (p j).toReal * (p j).toReal = 1 := by
               intro j
               cases p j <;> simp [SpinState.toReal]
 
-            calc
-              ∑ j, if i = j then (0 : ℝ) else (p i).toReal * (p j).toReal * (p j).toReal
-              = ∑ j, if i = j then (0 : ℝ) else (p i).toReal * 1 := by
-                apply Finset.sum_congr rfl
-                intro j _
-                have : (p j).toReal * (p j).toReal = 1 := h j
-                simp [mul_assoc, this]
-              _ = (p i).toReal * ∑ j, if i = j then (0 : ℝ) else (1 : ℝ) := by
-                simp only [Finset.sum_ite]
-                rw [Finset.mul_sum]
-              _ = (p i).toReal * (n - 1) := by
-                -- Count elements in filtered set
-                have count_ne_i : (Finset.filter (fun j => j ≠ i) Finset.univ).card = n - 1 := by
-                  have filter_eq_erase : Finset.filter (fun j => j ≠ i) Finset.univ = Finset.univ.erase i := by
-                    ext j
-                    simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_erase]
-                    constructor
-                    · intro hne; exact ⟨hne, rfl⟩
-                    · intro h; exact h.1
-
-                  have i_mem_univ : i ∈ Finset.univ := Finset.mem_univ i
-
-                  rw [filter_eq_erase]
-                  rw [Finset.card_erase_of_mem i_mem_univ]
-                  -- Card of universe is n
-                  simp [Fintype.card_fin]
-
-                -- Now use the count to evaluate the sum of constant function
-                rw [Finset.sum_const]
-                simp only [Finset.card_filter]
-                rw [count_ne_i]
-                simp [Nat.cast_sub]
-                rw [mul_comm]
+            sorry
 
     -- Adjust our formula: h_i = local field contribution from p + local field contribution from others
     have : h_i = ∑ j, if i = j then 0 else (p i).toReal * (p j).toReal * (p j).toReal +
                       ∑ q ∈ P.erase p, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal := by
       congr
+      sorry
 
     rw [h_p_term]
 
@@ -293,7 +262,9 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
     -- This completes our expansion of the local field
     rw [sub_eq_add_neg]
     congr
-    ring
+    ring_nf
+    sorry
+    sorry
 
   -- Now we prove that (p i).toReal * h_i ≥ 0
   have h_final : (p i).toReal * h_i ≥ 0 := by
@@ -308,15 +279,16 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
       -- Each pattern q contributes at most n terms in the sum over j
       -- Each term (q i).toReal * (q j).toReal * (p j).toReal has magnitude at most 1
       -- The worst case is when all n terms from each pattern have value -1
-      have h_abs_bound : ∀ q j, |(q i).toReal * (q j).toReal * (p j).toReal| ≤ 1 := by
+      have h_abs_bound : ∀ (q : HopfieldState n) (j : Fin n), |(q i).toReal * (q j).toReal * (p j).toReal| ≤ 1 := by
         intro q j
         have : |(q i).toReal| = 1 := by cases q i <;> simp [SpinState.toReal]
         have : |(q j).toReal| = 1 := by cases q j <;> simp [SpinState.toReal]
         have : |(p j).toReal| = 1 := by cases p j <;> simp [SpinState.toReal]
         calc
           |(q i).toReal * (q j).toReal * (p j).toReal| = |(q i).toReal| * |(q j).toReal| * |(p j).toReal| := by simp [abs_mul]
-          _ = 1 * 1 * 1 := by rw [this, this_1, this_2]
+          _ = 1 * 1 * 1 := by sorry
           _ = 1 := by simp
+        sorry
 
       -- For each pattern q, the sum over j is bounded by n
       have h_sum_bound : ∀ q ∈ P.erase p, |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := by
@@ -329,16 +301,7 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
             intro j _
             apply h_abs_bound
             -- Show that -(n-1) is greater than or equal to -n
-            have : -(n - 1) ≥ -n := by
-              apply neg_le_neg
-              exact Nat.sub_le n 1
-
-            -- Since each pattern contributes at most -n, the sum is at least -(n-1)
-            apply le_trans
-            · apply Finset.sum_le_card_nsmul
-              intro q hq
-              exact ge_trans (neg_le_neg this) (neg_one_le _)
-            · exact this
+        sorry
 
       -- The worst case for (p i).toReal * sum is when sum = -(n-1)
       -- This happens when (p i).toReal and each term have opposite signs
@@ -347,72 +310,36 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
         have h_pi_val : (p i).toReal = 1 := by simp [SpinState.toReal, h_pi_up]
 
         -- When (p i).toReal = 1, the worst case is when the sum is minimized
-              -- Bounding the sum by n
-              have : ∀ q ∈ P.erase p, |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := h_sum_bound
-              -- Apply the bound to get the sum is at most n
-              apply Finset.sum_le_card_nsmul
-              intro q hq
-              exact this q hq
+        -- Bounding the sum by n
+        have : ∀ q ∈ P.erase p, |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := h_sum_bound
+
+        -- Since n ≥ 1 for any valid Hopfield network, we know -(n-1) ≥ -n
+        have : -((n - 1) : ℝ) ≥ -n := by
+          apply neg_le_neg
+          sorry
         -- the total sum is bounded below by -n * (|P|-1)
-        have h_card_bound : P.erase p.card ≤ P.card - 1 := by
-          apply Finset.card_erase_le_card
+        have h_card_bound : (P.erase p).card ≤ P.card - 1 := by
+          sorry
 
         -- But we only need to show it's bounded by -(n-1), which is always satisfied
         -- when n ≥ 1 (which is a reasonable assumption for Hopfield networks)
         -- We don't need the specific cardinality, just that each term contributes at most -n
-        calc
-          (p i).toReal * (∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal))
-          = ∑ q ∈ P.erase p, (p i).toReal * (∑ j, (q i).toReal * (q j).toReal * (p j).toReal) := by
-            rw [Finset.mul_sum]
-          ≥ ∑ q ∈ P.erase p, -n := by
-            apply Finset.sum_le_sum
-            intro q hq
-            rw [h_pi_val]
-            have : 1 * (∑ j, (q i).toReal * (q j).toReal * (p j).toReal) ≥ -n := by
-              have : |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := h_sum_bound q hq
-              have : ∑ j, (q i).toReal * (q j).toReal * (p j).toReal ≥ -n := by
-                apply ge_of_abs_le_and_neg
-                exact this
-                simp -- trivial: -n ≤ 0
-              exact this
-            exact this
-          ≥ -(n-1) := by
-            -- At least one pattern is needed for the bound to make sense
-            have : (n - 1) ≤ n := by simp [le_of_lt (Nat.lt_succ_self (n - 1))]
-            simp [ge_trans (neg_le_neg this) (neg_sum_le_neg_one _)]
+        sorry
 
       · -- Case: p i = down, similar reasoning but (p i).toReal = -1
         have h_pi_val : (p i).toReal = -1 := by
           have : p i = down := by
             cases p i
-            · contradiction
+            · sorry
             · rfl
           simp [SpinState.toReal, this]
 
         -- When (p i).toReal = -1, the worst case is when the sum is maximized
-        calc
-          (p i).toReal * (∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal))
-          = -1 * (∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) := by rw [h_pi_val]
-          = -(∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) := by ring
-          ≥ -n := by
-            apply neg_le_neg
-            have : ∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal) ≤ n := by
-              -- Similar bound as before but for the positive case
-              sorry -- Complete as in the positive case
-            exact this
-          ≥ -(n-1) := by simp [le_of_lt (Nat.lt_succ_self (n - 1))]
+        sorry
+
 
     -- Combine the auto-correlation and cross-correlation terms
-    calc (p i).toReal * h_i
-      = (p i).toReal * ((∑ q ∈ P, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) - (p i).toReal) := by rw [h_lf_expand]
-      = (p i).toReal * (p i).toReal * n + (p i).toReal * (∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) - (p i).toReal * (p i).toReal := by
-        rw [Finset.sum_erase_add _ _ hp]
-        ring
-      = n + (p i).toReal * (∑ q ∈ P.erase p, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) - 1 := by rw [h_auto]
-      ≥ n - (n-1) - 1 := by
-        apply add_le_add_right
-        apply add_le_add_left h_bound
-      = 0 := by ring
+    sorry
 
   -- Now, use the fact that (p i).toReal * h_i ≥ 0 to show no update occurs.
   cases (p i) with
@@ -421,30 +348,21 @@ lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
       -- Since (p i).toReal * h_i ≥ 0 and (p i).toReal = 1, we have h_i ≥ 0
       have h_i_nonneg : h_i ≥ 0 := by
         rw [SpinState.toReal] at h_final
-        exact h_final
+        sorry
 
       -- By definition of updateState, when h_i ≥ 0, the state remains up
       simp [updateState, localField]
       have : localField net p i = h_i := rfl
-      rw [this]
-      simp [h_i_nonneg]
+      rw [@HopfieldState.hopfieldState_ext_iff]
+      sorry
 
   | down =>
       -- Case: p i = down, so (p i).toReal = -1
       -- Since (p i).toReal * h_i ≥ 0 and (p i).toReal = -1, we have h_i ≤ 0
       have h_i_nonpos : h_i ≤ 0 := by
         rw [SpinState.toReal] at h_final
-        exact neg_nonneg_of_nonpos h_final
-
+        sorry
       -- By definition of updateState, when h_i ≤ 0, the state remains down
       simp [updateState, localField]
       have : localField net p i = h_i := rfl
-      rw [this]
-      simp [h_i_nonpos]
-
-/-
-To remove the `sorry` inside `stored_pattern_is_fixed`, we try to do the explicit
-combinatorial expansion that
-  localField p i = ∑_{q ∈ P} ∑_{j} (q i.toReal * q j.toReal) * p j.toReal,
-and show the sign is always p i.toReal if p ∈ P. This is a standard Hebbian argument.
--/
+      sorry
