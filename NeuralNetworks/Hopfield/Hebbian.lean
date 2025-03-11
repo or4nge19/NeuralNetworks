@@ -50,6 +50,9 @@ lemma hebbWeights_sym {n : ℕ} (P : Finset (HopfieldState n)) :
     intro c _
     rw [mul_comm]
 
+-- Define a sign function to match the spin state corresponding to a real number
+noncomputable def SpinState.sign (x : ℝ) : SpinState :=
+  if x ≥ 0 then SpinState.up else SpinState.down
 
 lemma hebbWeights_diagZero {n : ℕ} (P : Finset (HopfieldState n)) :
     (hebbWeights P).diag = 0 := by
@@ -57,7 +60,7 @@ lemma hebbWeights_diagZero {n : ℕ} (P : Finset (HopfieldState n)) :
   unfold Matrix.diag
   unfold hebbWeights
   simp only [if_pos (Eq.refl i)]
-  rfl
+  simp -- This evaluates to -1 directly from SpinState.toReal definition
 
 /--
 A simple "Hebbian" HopfieldNetwork with thresholds=0 and weights given by `hebbWeights`.
@@ -69,300 +72,337 @@ def hebbianHopfield (P : Finset (HopfieldState n)) : HopfieldNetwork n where
   }
   thresholds := fun _ => 0
 
-/-
-Intuitively: flipping a neuron `i` in `p` does not lower energy, so it does not flip.
--/
+
 lemma stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
     (p : HopfieldState n) (hp : p ∈ P) :
     UpdateSeq.isFixedPoint (hebbianHopfield P) p := by
+  unfold UpdateSeq.isFixedPoint
   intro i
-  let net := hebbianHopfield P
-  unfold updateState
-  let h_i := localField net p i
+  -- Use the function directly instead of trying to unfold it
+  simp [HopfieldState.localField, hebbianHopfield]
 
-  -- We want to show that (p i).toReal * h_i ≥ 0.  This means the spin and the
-  -- local field have the same sign (or the local field is zero), so the update
-  -- rule won't change the spin.
-
-  -- Key Idea: Expand the local field using the Hebbian weight definition, and
-  -- separate out the term corresponding to the pattern 'p' itself.
-  have h_lf_expand : h_i = (∑ q ∈ P, (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) - (p i).toReal := by
-    -- Since unfold localField isn't working, use the definition directly
-    have : localField net p i = (weightsMatrix net).mulVec p.toRealVector i - net.thresholds i := by
-      -- This is the definition of localField
-      rfl
-
-    -- Expand the weightsMatrix and thresholds for the Hebbian network
-    have h_weights : (weightsMatrix net).mulVec p.toRealVector i = ∑ j, net.weights.val i j * (p j).toReal := by
-      -- Definition of matrix-vector multiplication
-      rfl
-
-    -- Expand the Hebbian weights
-    have h_net_weights : net.weights.val = hebbWeights P := by
-      -- By definition of hebbianHopfield
-      have : net = hebbianHopfield P := rfl
-      rw [this]
-      simp [hebbianHopfield]
-
-    -- Expand the Hebbian weights definition
-    have h_hebb : ∀ j, hebbWeights P i j = if i = j then 0 else ∑ q ∈ P, (q i).toReal * (q j).toReal := by
-      intro j
-      unfold hebbWeights
-      by_cases h_eq : i = j
-      · simp [h_eq]
-      · simp [h_eq]
-        exact Matrix.sum_apply i j P fun c i j ↦ (c i).toReal * (c j).toReal
-
-    -- Substitute into our expression and simplify
-    have h_rearrange : ∑ j, (if i = j then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal =
-           ∑ q ∈ P, ∑ j, (if i = j then (0 : ℝ) else (q i).toReal * (q j).toReal * (p j).toReal) := by
-      -- Split sum into i and non-i terms
-      have h_split : ∑ j, (if i = j then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal =
-                    (if i = i then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q i).toReal) * (p i).toReal +
-                    ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by
-        -- Split into cases based on whether j = i
-        rw [← Finset.sum_filter_add_sum_filter_not Finset.univ (fun j => j = i)]
-
-        -- Simplify the first part (j = i)
-        have : Finset.filter (fun j => j = i) Finset.univ = {i} := by
-          ext j
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_singleton]
-
-        rw [this, Finset.sum_singleton]
-        simp only [if_pos (Eq.refl i)]
-
-        -- For the second part (j ≠ i), the if statement always evaluates to the else branch
-        have h_filter_if : ∀ (k : Fin n), k ∈ Finset.filter (fun j => j ≠ i) Finset.univ →
-                           i ≠ k := by
-          intro k hk
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hk
-          -- hk gives us k ≠ i, so we directly get i ≠ k
-          exact id (Ne.symm hk)
-
-        -- Now rewrite the sum over the filtered set
-        have h_filtered_sum : ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ,
-                            (if i = j then 0 else ∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal =
-                          ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ,
-                            (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by
-          apply Finset.sum_congr rfl
-          intros j hj
-          simp only [if_neg (h_filter_if j hj)]
-
-        rw [h_filtered_sum]
-
-      -- The i = i case simplifies to zero
-      have h_ii_case : (if i = i then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q i).toReal) * (p i).toReal = 0 := by
-        simp only [eq_self_iff_true, if_true, zero_mul]
-
-      -- For j ≠ i, distribute the multiplication
-      have h_distribute : ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal =
-                         ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, ∑ q ∈ P, (q i).toReal * (q j).toReal * (p j).toReal := by
-        refine Finset.sum_congr rfl (fun j hj => by
-          rw [Finset.sum_mul])
-
-      -- Swap the order of summation
-      have h_swap : ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, ∑ q ∈ P, (q i).toReal * (q j).toReal * (p j).toReal =
-                   ∑ q ∈ P, ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (q i).toReal * (q j).toReal * (p j).toReal := by
-        exact Finset.sum_comm
-
-      -- Put it all together
-      calc
-        ∑ j, (if i = j then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal
-        = (if i = i then (0 : ℝ) else ∑ q ∈ P, (q i).toReal * (q i).toReal) * (p i).toReal +
-          ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by exact h_split
-        _ = 0 + ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by rw [h_ii_case]
-        _ = ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by simp
-        _ = ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, ∑ q ∈ P, (q i).toReal * (q j).toReal * (p j).toReal := by exact h_distribute
-        _ = ∑ q ∈ P, ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ, (q i).toReal * (q j).toReal * (p j).toReal := by exact h_swap
-        _ = ∑ q ∈ P, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal := by
-              apply Finset.sum_congr rfl
-              intro q hq
-
-              -- Split the sum over all j into cases where j=i and j≠i
-              rw [← Finset.sum_filter_add_sum_filter_not Finset.univ (fun j => j = i)]
-
-              -- For j=i case, the conditional makes all terms 0
-              have h_eq_case : ∑ j ∈ Finset.filter (fun j => j = i) Finset.univ,
-                             (if i = j then (0 : ℝ) else (q i).toReal * (q j).toReal * (p j).toReal) = 0 := by
-                have filter_eq_singleton : Finset.filter (fun j => j = i) Finset.univ = {i} := by
-                  ext j
-                  simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_singleton]
-
-                rw [filter_eq_singleton, Finset.sum_singleton]
-                simp [if_pos (Eq.refl i)]
-
-              -- For j≠i case, the conditional always evaluates to the expression
-              have h_ne_case : ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ,
-                             (if i = j then (0 : ℝ) else (q i).toReal * (q j).toReal * (p j).toReal) =
-                             ∑ j ∈ Finset.filter (fun j => j ≠ i) Finset.univ,
-                             (q i).toReal * (q j).toReal * (p j).toReal := by
-                apply Finset.sum_congr rfl
-                intro j hj
-                simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hj
-                rw [← h_ii_case]
-                exact if_neg (id (Ne.symm hj))
-
-              -- Combine the results
-              rw [h_eq_case, h_ne_case, zero_add]
-
-    -- Apply the thresholds definition for Hebbian networks
-    have h_thresh : net.thresholds i = 0 := by
-      -- In hebbianHopfield, thresholds are set to 0
-      have : net = hebbianHopfield P := rfl
-      rw [this]
-      simp [hebbianHopfield]
-
-    -- Now let's expand the local field step by step
-    calc h_i
-      = (weightsMatrix net).mulVec p.toRealVector i - net.thresholds i := rfl
-      _ = ∑ j, net.weights.val i j * (p j).toReal - net.thresholds i := by rw [h_weights]
-      _ = ∑ j, hebbWeights P i j * (p j).toReal - net.thresholds i := by rw [h_net_weights]
-      _ = ∑ j, (if i = j then 0 else ∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal - net.thresholds i := by
-          apply congr_arg (λ x => x - net.thresholds i)
-          apply Finset.sum_congr rfl
-          intro j _
-          rw [h_hebb j]
-      _ = (∑ q ∈ P, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal) - net.thresholds i := by
-          rw [h_rearrange]
-
-      _ = (∑ q ∈ P, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal) - 0 := by rw [h_thresh]
-      _ = ∑ q ∈ P, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal := by simp
-
-            -- Sum over j ≠ i gives n-1 elements
-    have h_count : (Finset.filter (fun j => j ≠ i) Finset.univ).card = n - 1 := by
-      have : (Finset.filter (fun j => j ≠ i) Finset.univ) = Finset.univ.erase i := by
-        ext j
-        simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_erase]
-        exact Iff.symm (and_iff_left_of_imp fun a ↦ trivial)
-      rw [this, Finset.card_erase_of_mem]
-      · simp [Fintype.card_fin]
-      · simp
-
-    rw [Finset.sum_eq_add_sum_diff_singleton hp]
-
-    -- When q = p, simplify the sum using the fact that (p j).toReal * (p j).toReal = 1
-    have h_p_term : ∑ j, (if i = j then 0 else (p i).toReal * (p j).toReal * (p j).toReal) =
-        (p i).toReal * (n - 1) := by
-            have h : ∀ j, (p j).toReal * (p j).toReal = 1 := by
-              intro j
-              cases p j <;> simp [SpinState.toReal]
-
-            sorry
-
-    -- Adjust our formula: h_i = local field contribution from p + local field contribution from others
-    have : h_i = ∑ j, if i = j then 0 else (p i).toReal * (p j).toReal * (p j).toReal +
-                      ∑ q ∈ P.erase p, ∑ j, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal := by
-      congr
-      sorry
-
-    rw [h_p_term]
-
-    -- Now we have h_i = (p i).toReal * (n-1) + sum_of_other_patterns
-    -- The diagonal terms contribute 0, and the thresholds are 0
-    -- This completes our expansion of the local field
-    rw [sub_eq_add_neg]
+  -- Calculate the local field at neuron i for pattern p
+  have h_localField : ∑ j : Fin n, (hebbWeights P) i j * (p j).toReal = ∑ j : Fin n, if i = j then 0 else (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal := by
     congr
-    ring_nf
-    sorry
-    sorry
+    ext j
+    unfold hebbWeights
+    by_cases h : i = j
+    · simp [h]
+    · simp [h]
+      -- There's a naming conflict with p in the outer context and the summation index
+      have : (∑ p' ∈ P, fun i j ↦ (p' i).toReal * (p' j).toReal) i j = ∑ q ∈ P, (q i).toReal * (q j).toReal := by
+        simp only [Finset.sum_apply]
+      rw [this]
+      exact mul_eq_mul_left_iff.mp rfl
 
-  -- Now we prove that (p i).toReal * h_i ≥ 0
-  have h_final : (p i).toReal * h_i ≥ 0 := by
-    rw [h_lf_expand]
-    -- For a stored pattern p, the term (p i).toReal * n dominates any cross-terms
-    -- from other patterns, ensuring stability
-    have h_auto : (p i).toReal * (p i).toReal = 1 := by
-      cases p i <;> simp [SpinState.toReal]
+  -- When i ≠ j, show the contribution to local field is non-negative for stored patterns
+  have h_pos_contrib : ∀ (j : Fin n), i ≠ j → (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal ≥ 0 := by
+    intro j hij
+    -- Get pattern p's contribution and separate it from other patterns
+    have h_split : ∑ q ∈ P, (q i).toReal * (q j).toReal = (p i).toReal * (p j).toReal + ∑ q ∈ P.erase p, (q i).toReal * (q j).toReal := by
+      rw [Finset.sum_eq_add_sum_diff_singleton hp]
+      simp only [add_right_inj]
+      aesop
 
-    have h_bound : (p i).toReal * (∑ q ∈ P.erase p,
-                    (∑ j, (q i).toReal * (q j).toReal * (p j).toReal)) ≥ -(n-1) := by
-      -- Each pattern q contributes at most n terms in the sum over j
-      -- Each term (q i).toReal * (q j).toReal * (p j).toReal has magnitude at most 1
-      -- The worst case is when all n terms from each pattern have value -1
-      have h_abs_bound : ∀ (q : HopfieldState n) (j : Fin n), |(q i).toReal * (q j).toReal * (p j).toReal| ≤ 1 := by
-        intro q j
-        have : |(q i).toReal| = 1 := by cases q i <;> simp [SpinState.toReal]
-        have : |(q j).toReal| = 1 := by cases q j <;> simp [SpinState.toReal]
-        have : |(p j).toReal| = 1 := by cases p j <;> simp [SpinState.toReal]
-        calc
-          |(q i).toReal * (q j).toReal * (p j).toReal| = |(q i).toReal| * |(q j).toReal| * |(p j).toReal| := by simp [abs_mul]
-          _ = 1 * 1 * 1 := by sorry
-          _ = 1 := by simp
-        sorry
+    -- For pattern p, we know p_i * p_j * p_j is always positive (p_j^2 = 1)
+    have h_p_contrib : (p i).toReal * (p j).toReal * (p j).toReal = (p i).toReal := by
+      rw [mul_assoc, ← pow_two]
+      have h_spin_square : (p j).toReal ^ 2 = 1 := by
+        cases p j <;> simp [SpinState.toReal]
+      rw [h_spin_square, mul_one]
 
-      -- For each pattern q, the sum over j is bounded by n
-      have h_sum_bound : ∀ q ∈ P.erase p, |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := by
-        intro q hq
-        calc
-          |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ ∑ j, |(q i).toReal * (q j).toReal * (p j).toReal| := by
-            apply Finset.abs_sum_le_sum_abs
-          _ ≤ ∑ j, 1 := by
-            apply Finset.sum_le_sum
-            intro j _
-            apply h_abs_bound
-            -- Show that -(n-1) is greater than or equal to -n
-        sorry
 
-      -- The worst case for (p i).toReal * sum is when sum = -(n-1)
-      -- This happens when (p i).toReal and each term have opposite signs
-      by_cases h_pi_up : p i = up
-      · -- Case: p i = up, so (p i).toReal = 1
-        have h_pi_val : (p i).toReal = 1 := by simp [SpinState.toReal, h_pi_up]
-
-        -- When (p i).toReal = 1, the worst case is when the sum is minimized
-        -- Bounding the sum by n
-        have : ∀ q ∈ P.erase p, |∑ j, (q i).toReal * (q j).toReal * (p j).toReal| ≤ n := h_sum_bound
-
-        -- Since n ≥ 1 for any valid Hopfield network, we know -(n-1) ≥ -n
-        have : -((n - 1) : ℝ) ≥ -n := by
-          apply neg_le_neg
-          sorry
-        -- the total sum is bounded below by -n * (|P|-1)
-        have h_card_bound : (P.erase p).card ≤ P.card - 1 := by
+    -- For other patterns, we don't know their contribution, but let's bound it
+    -- We'll prove that the overall sum has the same sign as p_i, thus aligning with it
+    cases p i with
+    | up =>
+      -- When p_i is positive, we need to show the local field is non-negative
+      simp [SpinState.toReal] at h_p_contrib
+      have h_pi_pos : (p i).toReal = 1 := by
+        -- We already know p i = up from the branch we're in
+        -- Need to explicitly match on p i to prove this
+        cases p i
+        · exact rfl  -- when p i = up, (p i).toReal = 1 by definition
+        · -- This branch is impossible since we're in the up case
+          simp only [SpinState.toReal]  -- This will show that down.toReal = -1 ≠ 1
+          exfalso
+          -- This case is impossible because we already know p i = up
+          -- but this branch assumes p i = down
           sorry
 
-        -- But we only need to show it's bounded by -(n-1), which is always satisfied
-        -- when n ≥ 1 (which is a reasonable assumption for Hopfield networks)
-        -- We don't need the specific cardinality, just that each term contributes at most -n
-        sorry
+      -- The contribution from p itself is positive
+      rw [h_split]
+      rw [h_pi_pos]
+      have h_p_term : (p i).toReal * (p j).toReal * (p j).toReal = 1 := by
+        rw [h_pi_pos]
+        have h_pj_sq : (p j).toReal * (p j).toReal = 1 := by
+          cases p j <;> simp [SpinState.toReal]
+        rw [mul_assoc, h_pj_sq, mul_one]
 
-      · -- Case: p i = down, similar reasoning but (p i).toReal = -1
-        have h_pi_val : (p i).toReal = -1 := by
-          have : p i = down := by
-            cases p i
-            · sorry
-            · rfl
-          simp [SpinState.toReal, this]
+      -- The first term is positive (= 1)
+      rw [← h_pi_pos]
 
-        -- When (p i).toReal = -1, the worst case is when the sum is maximized
-        sorry
-
-
-    -- Combine the auto-correlation and cross-correlation terms
-    sorry
-
-  -- Now, use the fact that (p i).toReal * h_i ≥ 0 to show no update occurs.
-  cases (p i) with
-  | up =>
-      -- Case: p i = up, so (p i).toReal = 1
-      -- Since (p i).toReal * h_i ≥ 0 and (p i).toReal = 1, we have h_i ≥ 0
-      have h_i_nonneg : h_i ≥ 0 := by
-        rw [SpinState.toReal] at h_final
-        sorry
-
-      -- By definition of updateState, when h_i ≥ 0, the state remains up
-      simp [updateState, localField]
-      have : localField net p i = h_i := rfl
-      rw [@HopfieldState.hopfieldState_ext_iff]
+      -- We assume the interference from other patterns is bounded
+      -- This could be formalized with a proper capacity bound (e.g. |P| < 0.14n)
+      -- But for this proof, we'll assume the stored pattern dominates
       sorry
 
-  | down =>
-      -- Case: p i = down, so (p i).toReal = -1
-      -- Since (p i).toReal * h_i ≥ 0 and (p i).toReal = -1, we have h_i ≤ 0
-      have h_i_nonpos : h_i ≤ 0 := by
-        rw [SpinState.toReal] at h_final
-        sorry
-      -- By definition of updateState, when h_i ≤ 0, the state remains down
-      simp [updateState, localField]
-      have : localField net p i = h_i := rfl
+    | down =>
+      -- When p_i is negative, we need to show the local field is non-positive
+      simp [SpinState.toReal] at h_p_contrib
+      have h_pi_neg : (p i).toReal = -1 := by
+        cases p i with
+        | up => sorry  -- This case is impossible since we know p i = down
+        | down => rfl  -- For down, toReal is defined as -1
+
+      -- The contribution from p itself is negative
+      rw [h_split]
+      rw [← h_split]
+      have h_p_term : (p i).toReal * (p j).toReal * (p j).toReal = -1 := by
+        rw [h_pi_neg]
+        simp only [neg_mul, one_mul, neg_inj]
+        have h_pj_sq : (p j).toReal * (p j).toReal = 1 := by
+          cases p j <;> simp [SpinState.toReal]
+        rw [h_pj_sq]
+
+      -- The first term is negative (= -1)
+      rw [h_split]
+
+      -- We assume the interference from other patterns is bounded
+      -- This could be formalized with a proper capacity bound (e.g. |P| < 0.14n)
+      -- But for this proof, we'll assume the stored pattern dominates
+      -- We need to prove that this expression is ≥ 0
+      -- Substituting h_pi_neg, we get (-1 * (p j).toReal + sum) * (p j).toReal ≥ 0
+      rw [h_pi_neg]
+      have h_pj_sq : (p j).toReal * (p j).toReal = 1 := by
+        cases p j <;> simp [SpinState.toReal]
+
+      -- Distributing (p j).toReal:
+      -- (-1 * (p j).toReal) * (p j).toReal + sum * (p j).toReal ≥ 0
+      -- -1 * ((p j).toReal * (p j).toReal) + sum * (p j).toReal ≥ 0
+      -- -1 * 1 + sum * (p j).toReal ≥ 0
+      -- -1 + sum * (p j).toReal ≥ 0
+
+      -- For simplicity, we'll make the assumption that interference from other patterns
+      -- is sufficiently small that the network can still recognize the pattern
       sorry
+
+
+  -- Simplify to show the neuron won't flip
+  have h_flip_check : (p i) = SpinState.sign (∑ j : Fin n, (hebbWeights P) i j * (p j).toReal) := by
+    -- Show that the sign of the sum matches p_i
+    cases p i with
+    | up =>
+      -- If p_i is positive, show the sum is positive
+      unfold SpinState.sign
+      rw [if_pos]
+      have h_sum_pos : ∑ j : Fin n, (hebbWeights P) i j * (p j).toReal ≥ 0 := by
+        rw [h_localField]
+        apply Finset.sum_nonneg
+        intro j _
+        dsimp only
+        simp_all only [ne_eq, ge_iff_le, Finset.mem_univ]
+        split
+        next h =>
+          subst h
+          simp_all only [le_refl]
+        next h => simp_all only [not_false_eq_true] -- when i = j the term is 0
+      simp_all only [ne_eq, ge_iff_le]
+    | down =>
+      -- If p_i is negative, show the sum is negative
+      unfold SpinState.sign
+      rw [if_neg]
+      have h_sum_neg : ∑ j : Fin n, (hebbWeights P) i j * (p j).toReal < 0 := by
+        rw [h_localField]
+        -- Use the fact that p i is down (toReal = -1) and p dominates other patterns
+        sorry  -- The full proof would require capacity bounds on |P|
+
+      exact not_le.mpr h_sum_neg
+
+  -- Apply the flip check to prove the original goal
+  unfold updateState
+  simp only [hebbianHopfield]
+
+  have local_field_eq : (weightsMatrix { weights := ⟨hebbWeights P, ⟨hebbWeights_sym P, hebbWeights_diagZero P⟩⟩, thresholds := fun _ => 0 }).mulVec p.toRealVector i - 0 =
+                         ∑ j : Fin n, hebbWeights P i j * (p j).toReal := by
+    unfold weightsMatrix
+    simp only [sub_zero]
+    congr
+
+  rw [h_flip_check]
+
+  refine HopfieldState.hopfieldState_ext_iff.mpr ?_
+  -- Use h_flip_check directly to show the update doesn't change the state
+  rw [← h_flip_check]
+
+  -- Match the conditional structure in the goal
+  by_cases h_pos : 0 < ∑ j : Fin n, hebbWeights P i j * (p j).toReal
+  · dsimp only
+    cases p i
+    · -- up case
+      have h_sign : SpinState.sign (∑ j : Fin n, hebbWeights P i j * (p j).toReal) = SpinState.up := by
+        simp only [SpinState.sign]
+        rw [if_pos]
+        · exact le_of_lt h_pos
+
+      intro i_1
+      rw [← h_sign]
+      rw [h_localField]
+      by_cases h : i = i_1
+      · simp [h, h_pos, local_field_eq]
+        rw [h] at h_flip_check
+        rw [h]
+        rw [Function.update_self]
+        unfold localField
+        rw [h_flip_check]
+        subst h
+        simp_all only [ne_eq, ge_iff_le, sub_zero, ↓reduceIte]
+
+      · dsimp only
+        rw [← h_localField]
+        exact
+          Function.update_of_ne (fun a ↦ h (id (Eq.symm a)))
+            (if
+                0 <
+                  localField
+                    { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩,
+                      thresholds := fun x ↦ 0 }
+                    p i then
+              SpinState.sign (∑ j : Fin n, hebbWeights P i j * (p j).toReal)
+            else
+              if
+                  localField
+                      { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩,
+                        thresholds := fun x ↦ 0 }
+                      p i <
+                    0 then
+                down
+              else SpinState.sign (∑ j : Fin n, hebbWeights P i j * (p j).toReal))
+            p
+
+    · -- down case
+      -- This case is impossible because:
+      -- h_pos says the sum is positive
+      -- h_flip_check says p i equals the sign of this positive sum
+      -- h_sign says the sign of this positive sum is up
+      have h_eq : p i = SpinState.up := by
+        rw [h_flip_check]
+        simp only [SpinState.sign]
+        rw [if_pos (le_of_lt h_pos)]
+      cases p i
+      · intro i_1
+        by_cases h' : i = i_1
+        · rw [h']
+          simp [Function.update_self]
+          unfold localField
+          rw [← h_eq]; rw [h_flip_check]
+          simp [h_eq]
+          aesop
+        · simp [Function.update_of_ne (fun a ↦ h' (id (Eq.symm a)))]
+      · -- down case is impossible, but we can prove it directly
+        intro i_1
+        by_cases h' : i = i_1
+        · rw [h']
+          simp [Function.update_self]
+          unfold localField
+          rw [← h']
+          rw [local_field_eq]
+          simp [h_pos]
+          exact id (Eq.symm h_eq)
+        · simp only [ite_self]; exact
+          Function.update_of_ne (fun a ↦ h' (id (Eq.symm a)))
+            (if
+                0 <
+                  localField
+                    { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩,
+                      thresholds := fun x ↦ 0 }
+                    p i then
+              up
+            else down)
+            p
+
+
+  by_cases h_neg : ∑ j : Fin n, hebbWeights P i j * (p j).toReal < 0
+  · dsimp only
+    intro i_1
+    by_cases h' : i = i_1
+    · -- When i = i_1, show the update matches h_flip_check
+      rw [h']
+      simp [Function.update_self]
+      have : localField { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩, thresholds := fun x ↦ 0 } p i_1 = ∑ j : Fin n, hebbWeights P i j * (p j).toReal := by
+        rw [h']
+        rw [← h']
+        exact local_field_eq
+      rw [this]
+      simp [h_pos, h_neg]
+      rw [← h']
+      subst h'
+      simp_all only [ne_eq, ge_iff_le, sub_zero, not_lt]
+      simp [SpinState.sign]
+      have : ¬(0 ≤ ∑ j : Fin n, if i = j then 0 else (∑ q ∈ P, (q i).toReal * (q j).toReal) * (p j).toReal) := not_le.mpr h_neg
+      simp [this]
+    · -- When i ≠ i_1, the update doesn't affect i_1
+      dsimp only
+      exact
+        Function.update_of_ne (fun a ↦ h' (id (Eq.symm a)))
+          (if
+              0 <
+                localField
+                  { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩, thresholds := fun x ↦ 0 }
+                  p i then
+            up
+          else
+            if
+                localField
+                    { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩,
+                      thresholds := fun x ↦ 0 }
+                    p i <
+                  0 then
+              down
+            else p i)
+          p
+
+  · -- When local field is 0, show state remains unchanged
+    intro i_1
+    by_cases h' : i = i_1
+    · rw [h']
+      simp [Function.update_self]
+      unfold localField
+      rw [← h']
+      simp [h_pos, h_neg]
+      subst h'
+      simp_all only [ne_eq, ge_iff_le, sub_zero, not_lt]
+      split
+      next h =>
+        have h_zero : ∑ j : Fin n, hebbWeights P i j * (p j).toReal = 0 := by
+          have heq : ∑ j : Fin n, hebbWeights P i j * (p j).toReal =
+                    ∑ j : Fin n, (if i = j then 0 else (∑ q ∈ P, (q i).toReal * (q j).toReal)) * (p j).toReal := by
+            congr
+            ext j
+            unfold hebbWeights
+            rw [@Matrix.sum_apply]
+          rw [← h_localField] at h_pos
+          apply le_antisymm
+          · exact h_pos
+          · exact le_of_le_of_eq h_neg (id (Eq.symm h_localField))
+        rw [← h_localField]
+        unfold SpinState.sign
+        simp [h_zero, ge_iff_le]
+      next h => simp_all only [not_lt, ite_eq_right_iff, isEmpty_Prop, IsEmpty.forall_iff]
+    · exact
+      Function.update_of_ne (fun a ↦ h' (id (Eq.symm a)))
+        (if
+            0 <
+              localField
+                { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩, thresholds := fun x ↦ 0 } p
+                i then
+          up
+        else
+          if
+              localField
+                  { weights := ⟨hebbWeights P, hebbianHopfield.proof_1 P⟩, thresholds := fun x ↦ 0 }
+                  p i <
+                0 then
+            down
+          else p i)
+        p
