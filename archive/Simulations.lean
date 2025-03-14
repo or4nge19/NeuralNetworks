@@ -1,16 +1,23 @@
+<<<<<<< Updated upstream:archive/Simulations.lean
 
 import NeuralNetworks.Hopfield.Basic
 
 /-
+=======
+import NeuralNetworks.Hopfield.Basic
+>>>>>>> Stashed changes:NeuralNetworks/Simulations.lean
 
 section SimulationAndAnalysis
 
-open HopfieldState UpdateSeq
+open SpinState HopfieldState UpdateSeq
 
 /--
 Example patterns for a 4-neuron Hopfield network (illustrative).
 -/
-def examplePatterns4 : Finset (HopfieldState 4) := Finset.univ.filter (fun s => overlap s s = 4) -- Placeholder - replace with meaningful patterns
+def examplePatterns4 : Finset (HopfieldState 4) :=
+  Finset.empty.insert (fun i => SpinState.ofBool (![true, false, true, false].get i))
+           .insert (fun i => SpinState.ofBool (![false, true, false, true].get i))
+  -- Example patterns
 
 /--
 Example Hebbian network for 4 neurons trained on example patterns.
