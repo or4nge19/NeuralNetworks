@@ -1,4 +1,4 @@
-import HopfieldNetworks.Basic
+import NeuralNetworks.Hopfield.Basic
 import Mathlib.Analysis.Normed.Field.Lemmas
 
 open Finset BigOperators
