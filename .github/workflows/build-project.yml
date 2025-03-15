@@ -54,5 +54,5 @@ jobs:
           key: LakeBuild-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}
           restore-keys: LakeBuild-
 
-      - name: Build project
-        run: ~/.elan/bin/lake build project
+      - name: Build NeuralNetworks
+        run: ~/.elan/bin/lake build NeuralNetworks
