@@ -8,11 +8,13 @@ import Mathlib.MeasureTheory.Decomposition.RadonNikodym
 import Mathlib.MeasureTheory.Decomposition.Lebesgue
 import Mathlib.Data.Real.StarOrdered
 import Mathlib.MeasureTheory.Constructions.Polish.Basic
+import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.MeasureTheory.Measure.Stieltjes
 import Mathlib.Order.CompletePartialOrder
-import Mathlib.Probability.Density
 import Mathlib.Probability.Kernel.Composition.CompProd
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
+import Mathlib.Probability.Distributions.Gaussian
+import Mathlib.MeasureTheory.Constructions.BorelSpace.Real
+import Mathlib.MeasureTheory.Group.Arithmetic
 import Mathlib
 
 --set_option maxHeartbeats 0
@@ -44,6 +46,7 @@ namespace ProbabilityTheory
 instance : MeasurableMul₂ ℝ := inferInstance
 instance : MeasurableNeg ℝ := inferInstance
 instance : MeasurableDiv₂ ℝ := inferInstance
+instance : MeasurableSub₂ ℝ := inferInstance
 
 variable {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
 
@@ -181,7 +184,6 @@ def haveLebesgueDecomposition_of_absolutelyContinuous {α : Type*} [MeasurableSp
   ⟨ (0, rnDeriv μ ν), (@measurable_rnDeriv α _ μ ν), MutuallySingular.zero_left, by
   simp_all only [zero_add]
   sorry⟩
-
 
 /-- The uniform distribution on the interval [a, b]. -/
 noncomputable def uniformContinuous (a b : α) (h : Fact (a < b)) [MeasureSpace α] (vol : Measure α) : Measure α :=
@@ -386,11 +388,10 @@ open MeasureTheory ProbabilityTheory ENNReal Real
 
 namespace ProbabilityTheory
 
+
 /-- Probability density function of the normal distribution -/
 noncomputable def normalPdf (μ σ : ℝ) (x : ℝ) : ℝ≥0∞ :=
   ENNReal.ofReal ((σ * Real.sqrt (2 * π))⁻¹ * Real.exp (-(x - μ) ^ 2 / (2 * σ ^ 2)))
-
-
 
 lemma measurable_normalPdf (μ σ : ℝ) [TopologicalSpace ℝ] [BorelSpace ℝ] [Fact (0 < σ)] : Measurable (normalPdf μ σ) :=
 by
@@ -403,10 +404,26 @@ by
         have h2 : 0 < Real.sqrt (2 * π) := Real.sqrt_pos.2 (mul_pos two_pos pi_pos)
         exact inv_nonneg.2 (mul_nonneg (le_of_lt h1) (le_of_lt h2))
       · exact le_of_lt (Real.exp_pos _)
-  refine Measurable.ennreal_ofReal (measurable_const ((σ * Real.sqrt (2 * π))⁻¹)) _
-  -- The inner function is the product of a constant and an exponential of a measurable function.
-  exact Measurable.mul (measurable_const ((σ * real.sqrt (2 * π))⁻¹))
-                      (Real.measurable_exp (λ x => -((x - μ)^2) / (2 * σ^2)))
+
+  -- The function is the composition of ENNReal.ofReal with a real-valued function
+  apply Measurable.comp (measurable_coe_nnreal_ennreal.comp measurable_real_toNNReal)
+
+  -- Show that the real-valued part is measurable
+  apply Measurable.mul
+  · -- Constant part is measurable
+    exact measurable_const
+  · -- Exponential part is measurable
+    refine Measurable.exp ?_
+    -- We need to rewrite as -(something) / constant
+    apply Measurable.div
+    · -- Negative of numerator (x - μ)²
+      apply Measurable.neg
+      apply Measurable.pow
+      · apply Measurable.sub
+        · exact measurable_id
+        · exact measurable_const
+      · exact measurable_const
+    · exact measurable_const
 
 /-- The standard normal measure -/
 noncomputable def normalMeasure (μ σ : ℝ) : Measure ℝ :=
@@ -436,23 +453,52 @@ instance normal_isProbabilityMeasure (μ σ : ℝ) [Fact (0 < σ)]  :
       have h_meas : Measurable (fun x => Real.exp (-(x - μ)^2 / (2 * σ^2))) := by
         apply Measurable.exp
         apply Measurable.div
-        · refine measurable_of_measurable_exp ?_
-          · refine measurable_of_measurable_exp ?_
-            · sorry
+        · apply Measurable.neg
+          apply Measurable.pow
+          · apply Measurable.sub
+            · exact measurable_id
+            · exact measurable_const
+          · exact measurable_const
         · exact measurable_const
 
       have h_subst : ∀ x, Real.exp (-(x - μ)^2 / (2 * σ^2)) =
-                          σ * Real.exp (-((x - μ)/(σ * Real.sqrt 2))^2) := by
+                          Real.exp (-((x - μ)/(σ * Real.sqrt 2))^2) := by
         intro x
-        field_simp [‹Fact (0 < σ)›.out]
-        ring_nf
-        sorry
+        -- Instead of using exp_neg which isn't working as expected,
+        -- we can directly show the equality of the exponents
+        have h_exp_eq : -(x - μ)^2 / (2 * σ^2) = -(((x - μ)/(σ * Real.sqrt 2))^2) := by
+          field_simp [‹Fact (0 < σ)›.out]
+          ring_nf
+          have h_sqrt : (Real.sqrt 2)^2 = 2 := Real.sq_sqrt (by norm_num)
+          -- Directly simplify the algebraic expression
+          simp only [pow_two]
+          field_simp [‹Fact (0 < σ)›.out, h_sqrt]
+          ring
+        rw [h_exp_eq]
+        -- Show that (x - μ)^2 / (2 * σ^2) = ((x - μ)/(σ * √2))^2
 
       have h_eq : ∫⁻ x, ENNReal.ofReal (Real.exp (-(x - μ)^2 / (2 * σ^2))) =
                   ENNReal.ofReal σ * ∫⁻ u, ENNReal.ofReal (Real.exp (-u^2)) := by
-        rw [lintegral_congr_ae]
-        · sorry
-        · exact ae_eq_rfl
+        -- For change of variables, we need to use lintegral_map with the substitution u = (x-μ)/(σ√2)
+        -- This is equivalent to x = μ + u·σ√2, with dx = σ√2 du
+        let f := fun u => u * σ * Real.sqrt 2
+        have h_deriv : ∀ u, HasDerivAt f (σ * Real.sqrt 2) u := fun u =>
+          by
+            simp [f]
+            have h_linear : HasDerivAt (fun u => (u * σ) * Real.sqrt 2) (σ * Real.sqrt 2) u :=
+              by
+                have h_mul_σ : HasDerivAt (fun y => y * σ) σ u := by exact hasDerivAt_mul_const σ
+                exact HasDerivAt.mul_const h_mul_σ √2
+            exact h_linear
+
+        have h_meas : Measurable f := by
+          apply Measurable.mul
+          · exact MeasurableSMul.measurable_smul_const σ  -- for u
+          · exact measurable_const  -- for (σ * √2)
+
+        -- This change of variables transforms the integral
+        sorry  -- Complete proof would use lintegral_map with appropriate Jacobian factor
+      aesop
     have h_gaussian_integral : ∫⁻ u, ENNReal.ofReal (Real.exp (-u^2)) = ENNReal.ofReal (Real.sqrt π) := by
       -- This is the standard Gaussian integral result: ∫ e^(-u²) du = √π
       dsimp only
@@ -546,6 +592,8 @@ instance normal_isProbabilityMeasure (μ σ : ℝ) [Fact (0 < σ)]  :
       exact h1
   simp [this]
   sorry
+
+variable (α β : Type*)
 
 /-- A random variable `X` has a normal distribution with parameters `μ` and `σ`
 if its probability density function is `normalPdf μ σ`. -/
@@ -676,43 +724,98 @@ lemma measurable_metropolisHastingsAcceptance
   exact Measurable.min h_one h_ratio
 
 noncomputable
-def metropolisHastingsKernel (pi : Measure α) [hπ : HasPDF (id : α → α) pi pi] [StandardBorelSpace α]
-    [Nonempty α] [MeasurableSingletonClass α] (q : α → Kernel α α)
-    [∀ x, IsSFiniteKernel (q x)] : Kernel α α :=
+def metropolisHastingsKernel' (pi : Measure α) [hπ : HasPDF (id : α → α) pi pi] [StandardBorelSpace α]
+    [Nonempty α] [MeasurableSingletonClass α] (q : Kernel α α)
+    [IsSFiniteKernel q] : Kernel α α :=
   { toFun := fun x =>
       let pdf := pdf (id : α → α) pi pi
       let acceptRate : α → ℝ≥0∞ := fun y =>
-        min 1 (metropolisHastingsAcceptance pdf (q x) x y)
-      Measure.withDensity (q x x) acceptRate,
-    measurable' := fun s hs => by
+        min 1 (metropolisHastingsAcceptance pdf q x y)
+      Measure.withDensity (q x) acceptRate,
+    measurable' := by
+      apply measurable_of_measurable_coe
+      intro s hs
       -- We need to show that x ↦ (metropolisHastingsKernel pi q) x s is measurable
-      -- This involves proving that x ↦ Measure.withDensity (q x x) acceptRate s is measurable
+      -- This involves proving that x ↦ Measure.withDensity (q x) acceptRate s is measurable
 
       -- First, establish measurability of the pdf
       have h_pdf_meas : Measurable (pdf (id : α → α) pi pi) := by
         -- This follows from the HasPDF assumption
         exact measurable_pdf id pi pi
 
-      -- For each fixed s, we need to prove that x ↦ (q x x) s is measurable
-      have h_q_meas : Measurable (fun x => (q x x) s) := by
-        -- This requires careful handling of currying and evaluation
-        sorry -- Requires detailed kernel measurability properties
+      -- For each fixed s, we need to prove that x ↦ (q x) s is measurable
+      have h_q_meas : Measurable (fun x => q x s) := by
+        -- This comes from the measurability of the kernel q
+        -- A kernel is measurable means exactly that for any measurable set s,
+        -- the function x ↦ q x s is measurable
+        exact Kernel.measurable_coe q hs
 
       -- Next, we need measurability of the acceptance rate function
       have h_accept_meas : Measurable (fun x => fun y =>
-        min 1 (metropolisHastingsAcceptance (pdf (id : α → α) pi pi) (q x) x y)) := by
+        min 1 (metropolisHastingsAcceptance (pdf (id : α → α) pi pi) q x y)) := by
         sorry -- Use measurable_metropolisHastingsAcceptance
 
       -- Finally, combine these to show measurability of the withDensity measure applied to s
       sorry -- This requires careful application of measurability of parametrized integrals
   }
 
+
+variable {α : Type*} [MeasurableSpace α]
+  [Nonempty α] [MeasurableSingletonClass α]
+
+/-- The usual Metropolis--Hastings acceptance probability. -/
+noncomputable
+def metropolisHastingsAcceptance' (pdf : α → ℝ≥0∞) (q : Kernel α α)
+  (x y : α) : ℝ≥0∞ :=
+  let num := pdf y * (q y) (singleton y)
+  let den := pdf x * (q x) (singleton x)
+  min 1 (num / den)
+
+/-- Measurability of the acceptance function as a function of `y`. -/
+lemma measurable_metropolisHastingsAcceptance'
+  {pdf : α → ℝ≥0∞} (hpdf : Measurable pdf)
+  {q : Kernel α α} (hq : ∀ (x : α), Measurable (λ y => (q y) (singleton y)))
+  (x : α) :
+  Measurable (λ y => metropolisHastingsAcceptance pdf q x y) :=
+by
+  -- We show that `y ↦ pdf y * (q y) {y}` is measurable, etc.
+  let denom := pdf x * (q x) (singleton x)  -- constant in y
+  have h_const : Measurable (λ _ : α => denom) := measurable_const
+  have h_num : Measurable (λ y => pdf y * (q y) (singleton y))
+  { refine Measurable.mul hpdf (hq x)
+    -- Using hq x which gives us measurability for the function at point x
+  }
+  have h_ratio : Measurable (λ y=> (pdf y * (q y) (singleton y)) / denom) :=
+    Measurable.div h_num h_const
+  -- then `min 1 (...)` is also measurable:
+  exact Measurable.min measurable_const h_ratio
+
+
+/-- One-step Metropolis--Hastings kernel. -/
+noncomputable
+def metropolisHastingsKernel
+  (pi : Measure α) [HasPDF (id : α → α) pi pi]
+  (q : Kernel α α)
+  : Kernel α α :=
+{ toFun := λ x =>
+    let f : α → ℝ≥0∞ := λ y => metropolisHastingsAcceptance (pdf id pi pi) q x y
+    -- withDensity from the measure (q x)
+    (q x).withDensity f,
+  measurable' :=
+  by
+    -- Outline: show x ↦ (q x).withDensity f is measurable in x
+    -- requires standard “kernel is measurable in x, withDensity measurable, etc.”
+    sorry
+   }
+
+
+
 theorem metropolisHastingsKernel_apply [StandardBorelSpace α] [MeasurableSingletonClass α] [Nonempty α]
     {pi : Measure α} [HasPDF (id : α → α) pi pi]
-    {q : α → Kernel α α} [∀ x, IsSFiniteKernel (q x)] {x : α} {s : Set α}
+    {q : Kernel α α} [IsSFiniteKernel q] {x : α} {s : Set α}
     [DecidablePred (· ∈ s)] (hs : MeasurableSet s) :
     (metropolisHastingsKernel pi q) x s =
-      ∫⁻ y in s, metropolisHastingsAcceptance (pdf (id : α → α) pi pi) (q x) x y ∂(q x) := by
+      ∫⁻ y in s, metropolisHastingsAcceptance (pdf (id : α → α) pi pi) q x y ∂(q x) := by
     sorry -- TODO: Should follow from a careful rewriting of all the pieces
 
 end ProbabilityTheory
