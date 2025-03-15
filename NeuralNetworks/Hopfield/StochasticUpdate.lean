@@ -1,7 +1,14 @@
+/-
+Copyright (c) 2025 Matteo Cipollina. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Matteo Cipollina
+-/
+
 import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import NeuralNetworks.Hopfield.Basic
 import NeuralNetworks.Hopfield.Energy
+import NeuralNetworks.ForMathlib.MetropolisHastings
 
 
 namespace HopfieldState

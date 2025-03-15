@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Matteo Cipollina. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Matteo Cipollina
+-/
+
 import NeuralNetworks.Hopfield.Basic
 
 section BiasedHopfieldNetwork
@@ -38,7 +44,7 @@ Or equivalently, we can absorb the bias into the thresholds: `thresholds' = thre
 Then `E(x) = -1/2 xᵀWx - thresholds'ᵀx`.
 And `localField_biased(x, i) = (Wx)_i - thresholds'[i]`.
 
-Let's keep the original thresholds and add a separate bias term in the energy function.
+We keep the original thresholds and add a separate bias term in the energy function.
 `E_biased(x) = -1/2 xᵀWx - bᵀx - biasᵀx = E(x) - biasᵀx`.
 `E_biased(x) = -1/2 xᵀWx - Finset.sum Finset.univ (fun i => net.thresholds i * xVec i) - Finset.sum Finset.univ (fun i => net.bias i * xVec i)`
 `E_biased(x) = -1/2 xᵀWx - Finset.sum Finset.univ (fun i => (net.thresholds i + net.bias i) * xVec i)`
@@ -203,7 +209,7 @@ noncomputable def sigmoid (x : ℝ) : ℝ := 1 / (1 + Real.exp (-x))
 -- We could define an update rule based on sigmoid:
 -- Probability of neuron i being `up` in the next state is sigmoid(localField(x, i)).
 
--- Further explorations:
+-- Further explorations / TODOs:
 -- - Analyze convergence of synchronous updates (less guaranteed than asynchronous, can have cycles).
 -- - Formalize and analyze stochastic update rules and their properties (e.g., stationary distributions).
 -- - Investigate different thresholding functions and their impact on network dynamics.

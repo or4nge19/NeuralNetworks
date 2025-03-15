@@ -1,20 +1,19 @@
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import Mathlib.Probability.Kernel.Basic
-import Mathlib.MeasureTheory.Integral.SetIntegral
-import Mathlib.Probability.Density
-import Mathlib.MeasureTheory.Integral.IntervalIntegral
-import Mathlib.Probability.Kernel.CondDistrib
-import Mathlib.MeasureTheory.Decomposition.RadonNikodym
-import Mathlib.MeasureTheory.Decomposition.Lebesgue
+/-
+Copyright (c) 2025 Matteo Cipollina. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Matteo Cipollina
+-/
+
+import Mathlib.Algebra.Lie.OfAssociative
+import Mathlib.Analysis.Calculus.Deriv.Mul
 import Mathlib.Data.Real.StarOrdered
 import Mathlib.MeasureTheory.Constructions.Polish.Basic
-import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.MeasureTheory.Measure.Stieltjes
 import Mathlib.Order.CompletePartialOrder
+import Mathlib.Probability.Density
 import Mathlib.Probability.Kernel.Composition.CompProd
-import Mathlib.Probability.Distributions.Gaussian
-import Mathlib.MeasureTheory.Constructions.BorelSpace.Real
-import Mathlib.MeasureTheory.Group.Arithmetic
+import Mathlib.Probability.ProbabilityMassFunction.Constructions
+import Mathlib.Topology.Algebra.Module.ModuleTopology
 import Mathlib
 
 --set_option maxHeartbeats 0
@@ -820,4 +819,4 @@ theorem metropolisHastingsKernel_apply [StandardBorelSpace α] [MeasurableSingle
 
 end ProbabilityTheory
 
-#min_imports
+--#min_imports

@@ -8,7 +8,7 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import Mathlib.GroupTheory.GroupAction.Basic
 import Mathlib.Data.Fintype.Card
-import HopfieldNetworks.Basic
+import NeuralNetworks.Hopfield.Basic
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000
@@ -21,7 +21,7 @@ variable {n : ℕ} (net : HopfieldNetwork n) (x : HopfieldState n) (i : Fin n)
 # Hopfield Networks Formalization (Bool-Based) - Adaptive Threshold Example
 
 Illustrative example showing how the framework could be extended towards
-more adaptable and potentially "intelligent" systems, though still far from ASI.
+more adaptable and potentially "intelligent" systems.
 This introduces a very basic form of adaptive thresholds.
 -/
 
