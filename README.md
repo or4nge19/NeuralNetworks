@@ -27,7 +27,7 @@ This project contains a Lean 4 formalization of Hopfield networks. Hopfield netw
 
 ### Getting Started
 
-To use this formalization, you need to have Lean 4 installed on your system. Clone this repository and explore the `HopfieldNetworks` directory for the Lean files and their respective formalizations.
+To use this formalization, you need to have Lean 4 installed on your system. Clone this repository and explore the `NeuralNetworks.Hopfield` directory for the Lean files and their respective formalizations.
 
 ### Usage
 
