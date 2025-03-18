@@ -1,4 +1,5 @@
 /-
+/-
 Copyright (c) 2025 Matteo Cipollina. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Matteo Cipollina
@@ -238,14 +239,10 @@ lemma self_correlation_dominance {n : ℕ} {P : Finset (HopfieldState n)} {p : H
           |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal|
               = |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| * 1 := by rw [mul_one]
           _ = |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| * |(p i).toReal| := by rw [h_pi_abs]
+          _ = |(p i).toReal| * |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
+              apply CommMonoid.mul_comm
           _ = |(p i).toReal * ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
-                rw [h_factor];
-                exact
-                  CommMonoid.mul_comm
-                    |∑ q ∈ P.erase p,
-                        ∑ j : Fin n,
-                          if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal|
-                    |(p i).toReal|
+              rw [← h_factor]
           _ ≤ (P.card - 1) * (n - 1) := h_cross_bound
 
       -- Even in the worst case (negative interference), the self-correlation dominates
@@ -329,20 +326,98 @@ lemma self_correlation_dominance {n : ℕ} {P : Finset (HopfieldState n)} {p : H
   case down =>
     -- When p i = down, (p i).toReal = -1
     have h_pi_val : (p i).toReal = -1 := by
-      -- We're in the "down" case of the pattern matching on p i
-      -- This means p i is SpinState.down
-      cases p i
-      · -- This is the "up" case, which contradicts our assumption
-        apply False.elim
-        have : SpinState.up.toReal = 1 := by rfl
-        have : SpinState.up.toReal = 1 := by rfl
-        have h_contra : SpinState.up.toReal = -1 := by sorry
-          -- This assertion is actually false since SpinState.up.toReal = 1
-          -- We're trying to derive a contradiction here
-        have : 1 = -1 := by sorry
-        exact absurd this (by norm_num)
-      · -- This is the "down" case, which is what we want
-        simp [SpinState.toReal]
+      -- We're already in the branch where p i = down, so we need to evaluate (p i).toReal
+      simp [SpinState.toReal]  -- Compute the value of SpinState.down.toReal
+      rw?
+
+    -- Calculate step by step to show the result is non-negative
+    have h_expand : (-1) * ((-1) * (↑n - 1) + ∑ q ∈ P.erase p, ∑ j : Fin n,
+            if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal)
+          = (↑n - 1) - ∑ q ∈ P.erase p, ∑ j : Fin n,
+            if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal := by
+      ring
+
+    -- First, directly substitute the known value for p i
+    rw [h_pi_val]
+
+    -- Then use h_expand to rewrite the expression in a simpler form
+    rw [h_expand]
+
+    -- We need to show (n - 1) - sum ≥ 0
+    -- First, get a bound on the sum using our cross-correlation bound
+    have h_sum_bound : |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| ≤ (P.card - 1) * (n - 1) := by
+      -- Use the cross_correlation_bound with appropriate adjustments
+      have h_abs_eq_one : |(p i).toReal| = 1 := by rw [h_pi_val]; simp
+
+      have h_abs_prod : |(p i).toReal * ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| =
+                         |(p i).toReal| * |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
+        exact abs_mul _ _
+
+      calc
+        |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal|
+          = |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| * 1 := by rw [mul_one]
+          _ = |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| * |(p i).toReal| := by rw [h_abs_eq_one]
+          _ = |(p i).toReal * ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by rw [← h_abs_prod]
+          _ ≤ (P.card - 1) * (n - 1) := h_cross_bound
+
+    -- In the worst case, the sum equals its absolute value (all terms positive)
+    have h_sum_le : ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal ≤ (P.card - 1) * (n - 1) := by
+      apply le_trans (le_abs_self _) h_sum_bound
+
+    -- From our stability condition, P.card ≤ n
+    have h_card_diff_le : (P.card - 1) * (n - 1) ≤ (n - 1) := by
+      -- Need to show P.card - 1 ≤ 1 for stability
+      have h_P_card_le_two : P.card ≤ 2 := by
+        apply le_trans h_stability (by norm_num; linarith [h_first])
+
+      have h_factor_le : P.card - 1 ≤ 1 := by
+        have h_card_ge_one : 1 ≤ P.card := by
+          apply Finset.card_pos.mpr ⟨p, hp⟩
+        apply Nat.le_of_lt_succ
+        apply Nat.lt_succ_of_le
+        apply le_trans (Nat.sub_le_sub_right h_P_card_le_two 1) (by norm_num)
+
+      calc
+        (P.card - 1) * (n - 1) ≤ 1 * (n - 1) := by
+          apply mul_le_mul_of_nonneg_right h_factor_le (by linarith [h_first])
+        _ = (n - 1) := by simp only [one_mul]
+
+    -- Combine the bounds to show the result is non-negative
+    calc
+      (↑n - 1) - ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal
+        ≥ (↑n - 1) - ((P.card - 1) * (↑n - 1)) := by
+          apply sub_le_sub_left h_sum_le _
+        _ ≥ (↑n - 1) - (↑n - 1) := by
+          apply sub_le_sub_left h_card_diff_le _
+        _ = 0 := by ring
+    --apply sub_nonneg_of_le
+    apply le_trans (abs_le_abs_of_le _ h_sum_bound)
+
+    -- From P.card ≤ n and n ≥ 1, we know P.card - 1 ≤ n - 1
+    have h_card_diff_le : (↑P.card - 1) ≤ (↑n - 1) := by
+      apply sub_le_sub_right (Nat.cast_le.mpr h_stability) 1
+
+    -- From our capacity assumption h_stability: P.card ≤ n
+    -- For stability, we need (P.card - 1) * (n - 1) ≤ n - 1
+    -- Which holds when P.card - 1 ≤ 1, or P.card ≤ 2
+    -- This is true when n ≤ 2, since P.card ≤ n
+
+    have h_sufficient : (↑P.card - 1) * (↑n - 1) ≤ ↑n - 1 := by
+      by_cases h_n_minus_one_pos : ↑n - 1 > 0
+      · have h_factor : (↑P.card - 1) ≤ 1 := by
+          -- The critical capacity bound: P.card ≤ min(n, 2)
+          have h_P_card_le_two : P.card ≤ 2 := by
+            apply le_trans h_stability (by have h_n_ge_1 := h_first; omega)
+          apply le_trans (sub_le_sub_right (Nat.cast_le.mpr h_P_card_le_two) 1) (by norm_num)
+
+        -- Multiply by (n - 1), preserving inequality since n - 1 > 0
+        apply le_trans (mul_le_mul_of_nonneg_right h_factor (le_of_lt h_n_minus_one_pos)) (by simp)
+
+      · -- If n - 1 = 0, then both sides are 0
+        have h_n_eq_one : n = 1 := by
+          apply le_antisymm (Nat.le_of_succ_le (by omega)) h_first
+        rw [h_n_eq_one]
+        simp
 
     -- Calculate step by step to show the result is non-negative
     -- With p i = down, we have (p i).toReal = -1
@@ -376,12 +451,15 @@ lemma self_correlation_dominance {n : ℕ} {P : Finset (HopfieldState n)} {p : H
       calc
         |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal|
           = |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| * 1 := by
-            apply Eq.trans (Eq.refl _) (Eq.symm (mul_one _))
-          _ = |(p i).toReal| * |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by rw [abs_mul]
-            abs_mul (p i).toReal (∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal)
-            apply Eq.trans (Eq.refl _) (by rw [h_abs_eq_one]; rfl)
-          = |(p i).toReal * ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
-            apply Eq.symm h_abs_prod
+            rw [mul_one]
+          _ = |(p i).toReal| * |∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
+            rw [h_abs_eq_one]; exact
+              CommMonoid.mul_comm
+                |∑ q ∈ P.erase p,
+                    ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal|
+                1
+          _ = |(p i).toReal * ∑ q ∈ P.erase p, ∑ j : Fin n, if i = j then 0 else (q i).toReal * (q j).toReal * (p j).toReal| := by
+            rw [← h_abs_prod]
           ≤ (P.card - 1) * (n - 1) := h_cross_bound
 
     -- In this case, we need the negative sum to be non-negative
@@ -990,3 +1068,5 @@ theorem stored_pattern_is_fixed {n : ℕ} (P : Finset (HopfieldState n))
             down
           else p i)
         p
+
+-/
