@@ -5,7 +5,7 @@ namespace LLM.GPT2.ByteArray
 open Batteries
 open LLM.GPT2 -- To access bytesPerFloat without prefix
 
--- == Section 2: Optimized ByteArray Float I/O ==
+--  Section 2: Optimized ByteArray Float I/O 
 
 /--
 Reads a Float from a ByteArray at the given offset in Little Endian format.
