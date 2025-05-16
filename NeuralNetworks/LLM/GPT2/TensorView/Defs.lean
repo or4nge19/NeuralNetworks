@@ -12,7 +12,7 @@ open Batteries
 
 namespace LLM.GPT2
 
--- == Section 3: TensorView Structure and Safety ==
+-- Section 3: TensorView Structure and Safety 
 
 /--
 A view into a tensor stored in a ByteArray. Represents a multi-dimensional tensor with a specific
