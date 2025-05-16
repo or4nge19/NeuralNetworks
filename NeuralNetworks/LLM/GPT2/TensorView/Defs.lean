@@ -7,17 +7,26 @@ import Mathlib.Algebra.Order.Star.Basic
 import Mathlib.Data.Array.Extract
 import Mathlib.Data.Nat.Lattice
 
-open LLM.GPT2 -- For Core types like TensorError, bytesPerFloat
+open LLM.GPT2
 open Batteries
 
+set_option linter.unusedVariables false
 namespace LLM.GPT2
 
--- == Section 3: TensorView Structure and Safety ==
+--  Section 3: TensorView Structure and Safety
+
 
 /--
-A view into a tensor stored in a ByteArray. Represents a multi-dimensional tensor with a specific
-shape, stored in a ByteArray at a given byte offset. The view doesn't own the data but provides
-safe access methods to it.
+A `TensorView` provides a typed, multi-dimensional view into a `ByteArray` storage.
+It defines the shape, rank, and offset of the tensor data within the storage.
+
+This structure is designed to work within a stateful context `s`
+because it holds a reference (`ST.Ref`) to the underlying `ByteArray`.
+
+Key properties:
+- The `rank` (number of dimensions) is explicitly stored and proven to be equal to `shape.size`.
+- The `offsetBytes` into the storage is proven to be aligned to `bytesPerFloat`.
+- All dimension sizes in `shape` are proven to be positive.
 -/
 structure TensorView (s : Type) where
   /-- Shape of the tensor, as an array of dimension sizes. Validated > 0. -/
@@ -53,12 +62,16 @@ is equal to `arr[i]` (safe get, written as `arr[i]'h_bounds`).
 -/
 lemma getElem_eq_get! {α : Type} [Inhabited α] {arr : Array α} {i : Nat} (h_bounds : i < arr.size) :
     arr[i]! = arr[i]'h_bounds := by
-  rw [getElem!_pos arr i h_bounds]
+  exact getElem!_pos arr i h_bounds
 
 end Array
 
+/--
+This lemma is similar to `Array.getElem_of_mem`, but it provides the equality with `arr[i]!`
+instead of `arr[i]`.
+-/
 lemma exists_index_of_mem_with_get_bang
-    {α : Type} [BEq α] [LawfulBEq α] [Inhabited α]
+    {α : Type} [Inhabited α]
     {arr : Array α} {x : α} (h_mem : x ∈ arr) :
     ∃ i : Nat, i < arr.size ∧ arr[i]! = x := by
   rcases Array.getElem_of_mem h_mem with ⟨i, h_i_lt, h_get⟩
@@ -78,7 +91,6 @@ lemma TensorView.elementCount_pos {s : Type} (tv : TensorView s) : tv.elementCou
   rw [h]
   apply List.prod_pos
   intro x hx_mem_list
-  have h_mem := @Array.mem_toList_iff Nat x tv.shape
   have h_x_in_array : x ∈ tv.shape := by
     rw [← Array.mem_toList_iff]
     exact hx_mem_list
@@ -142,7 +154,8 @@ def TensorView.mkUnsafe (s : Type) (shape : Array Nat) (rank : Nat) (storageRef 
         exact i.isLt) > 0) : TensorView s :=
   { shape, rank, storageRef, offsetBytes, h_offset_aligned, h_dims_positive, h_rank_eq_size }
 
-protected def TensorView.reprPrec {s : Type} (tv : TensorView s) (_prec : Nat) : Std.Format :=
+/-- Represent the `TensorView` as `Std.Format` with the given precedence. -/
+protected def TensorView.reprPrec {s : Type} (tv : TensorView s) (prec : Nat) : Std.Format :=
   let shapeStr := toString tv.shape
   let rankStr := toString tv.rank
   let offsetStr := toString tv.offsetBytes
@@ -155,6 +168,31 @@ instance (s : Type) : Repr (TensorView s) where
 /--
 Helper function for computing flat indices. Processes the dimensions in reverse order
 (from least significant to most significant).
+
+Given:
+
+- `shape`: An array representing the dimensions of the tensor.
+- `rank`: The number of dimensions of the tensor (i.e., `shape.size`).
+- `indices`: An array of indices specifying the element to access.
+- `i_rev`: The current dimension index being processed, in reverse order (from `0` to `rank - 1`).
+       It corresponds to `rank - 1 - i` where `i` is the actual dimension index.
+- `flatIndexRel`: The partially computed flat index from less significant dimensions.
+- `stride`: The stride for the current dimension `i`.
+
+this function iterates from the least significant dimension (`i_rev = 0`, which is `i = rank - 1`)
+to the most significant dimension.
+In each step:
+1. It retrieves the current `index` and `dimSize` for dimension `i = rank - 1 - i_rev`.
+2. It checks if `index` is out of bounds for `dimSize`. If so, it returns `TensorError.indexOutOfBounds`.
+3. Otherwise, it updates `flatIndexRel` by adding `index * stride`.
+4. It updates `stride` for the next (more significant) dimension by multiplying with `dimSize`.
+5. It recursively calls itself for the next dimension (`i_rev + 1`).
+
+The base case for the recursion is when `i_rev >= rank`, meaning all dimensions have been processed.
+In this case, it returns the final `flatIndexRel`.
+
+The `termination_by` clause `rank - i_rev` makes the function terminate because `i_rev` increases
+in each recursive call, and `rank` is fixed, so `rank - i_rev` decreases.
 -/
 def computeHelper (shape : Array Nat) (rank : Nat) (indices : Array Nat)
                   (i_rev : Nat) (flatIndexRel : Nat) (stride : Nat)
@@ -174,9 +212,72 @@ def computeHelper (shape : Array Nat) (rank : Nat) (indices : Array Nat)
 termination_by rank - i_rev
 
 /--
-Computes the flat index relative to the start of the tensor view.
-Returns an error if dimensions mismatch or indices are out of bounds.
-Requires proof that shape dimensions are positive.
+`ComputeHelperRel` defines a relation that mirrors the logic of the `computeHelper`
+function, which is  used to calculate a flat (1D) index from a
+multi-dimensional index array. This relational definition is provided as an
+alternative to the functional one, primarily to try simplify and facilitate proofs
+about the properties of `computeHelper` within the `Lemmas.lean` file.
+
+The relation `ComputeHelperRel shape rank indices i fir sa res` holds if,
+starting from an iteration index `i`, a current flat index `fir` (flat index relative),
+and a current stride `sa` (stride accumulator), the computation eventually
+results in `res`.
+-/
+inductive ComputeHelperRel (shape : Array Nat) (rank : Nat) (indices : Array Nat) :
+  Nat → Nat → Nat → Nat → Prop where
+| tc (i fir sa) (h_term : i >= rank) :
+    ComputeHelperRel shape rank indices i fir sa fir
+| rs (i fir sa newFir newSa res)
+    (h_not_term : i < rank)
+    (k : Nat) (hk_def : k = rank - 1 - i)
+    (h_k_lt_idx_size : k < indices.size) (h_k_lt_shape_size : k < shape.size)
+    (idx_val : Nat) (h_idx_eq : idx_val = indices[k]'h_k_lt_idx_size)
+    (dim_val : Nat) (h_dim_eq : dim_val = shape[k]'h_k_lt_shape_size)
+    (h_bound : idx_val < dim_val)
+    (h_newFir_def : newFir = fir + idx_val * sa)
+    (h_newSa_def : newSa = sa * dim_val)
+    (h_recursive_call : ComputeHelperRel shape rank indices (i+1) newFir newSa res) :
+    ComputeHelperRel shape rank indices i fir sa res
+
+
+/--
+Computes the flat (1D) index from a multi-dimensional `indices` array for a tensor
+with a given `shape` and `rank`.
+
+This function translates a coordinate in a multi-dimensional space into a
+single linear index, which can be used for accessing elements in a flat memory layout.
+The specific mapping (e.g., row-major or column-major) depends on the
+implementation of the `computeHelper` function, which performs the actual calculation.
+
+Given:
+- `shape`: An `Array Nat` representing the dimensions of the tensor.
+  Each element `shape[j]` is the size of the j-th dimension.
+- `rank`: A `Nat` indicating the number of dimensions of the tensor.
+- `h_rank_eq_size`: A proof that `rank` is equal to `shape.size`. This ensures
+  consistency between the provided rank and the shape array.
+- `_`: An (unnamed) proof that all dimension sizes in `shape` are strictly positive
+  (i.e., `shape[j] > 0` for all `j` up to `rank`). This is crucial for meaningful tensor
+  structures and stride calculations.
+- `indices`: An `Array Nat` containing the multi-dimensional coordinates for which
+  the flat index is to be computed. `indices[j]` is the index for the j-th dimension.
+
+it returns:
+- `Except TensorError Nat`:
+  - `Except.ok flatIndex`: If the input is valid (specifically, if `indices.size == rank`),
+    this contains the calculated `flatIndex` as a `Nat`.
+  - `Except.error (TensorError.shapeMismatch rank indices.size)`: If the number of
+    provided `indices` (i.e., `indices.size`) does not match the tensor `rank`.
+
+Note:
+- The validation of whether individual `indices[j]` are within the bounds of `shape[j]`
+  (i.e., `0 <= indices[j] < shape[j]`) is not performed by this function directly.
+  It is assumed that such checks are either handled by the `computeHelper` function
+  or ?.
+- The `computeHelper` function is responsible for the actual index calculation,
+  being invoked as `computeHelper shape rank indices 0 0 1`. The precise meaning
+  of the `0 0 1` arguments depends on `computeHelper`'s signature and logic,
+  but they would represent initial values for an iterative or recursive calculation
+  (e.g., current dimension index, accumulated offset, and an initial multiplier/stride).
 -/
 @[inline]
 def computeFlatIndex (shape : Array Nat) (rank : Nat)
