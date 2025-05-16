@@ -1,6 +1,6 @@
 import NeuralNetworks.LLM.GPT2.TensorView.Defs
 
-open LLM.GPT2 -- For Core types like TensorError, bytesPerFloat
+open LLM.GPT2 
 open Batteries
 
 namespace LLM.GPT2
