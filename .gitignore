@@ -34,3 +34,4 @@
 *.synctex.gz
 *.synctex.gz(busy)
 *.pdfsync
+NeuralNetworks/LLM/GPT2/TensorView.lean
