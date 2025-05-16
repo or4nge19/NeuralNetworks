@@ -7,7 +7,7 @@ import Mathlib.Algebra.Order.Star.Basic
 import Mathlib.Data.Array.Extract
 import Mathlib.Data.Nat.Lattice
 
-open LLM.GPT2 -- For Core types like TensorError, bytesPerFloat
+open LLM.GPT2 
 open Batteries
 
 namespace LLM.GPT2
@@ -176,7 +176,6 @@ termination_by rank - i_rev
 /--
 Computes the flat index relative to the start of the tensor view.
 Returns an error if dimensions mismatch or indices are out of bounds.
-Requires proof that shape dimensions are positive.
 -/
 @[inline]
 def computeFlatIndex (shape : Array Nat) (rank : Nat)
