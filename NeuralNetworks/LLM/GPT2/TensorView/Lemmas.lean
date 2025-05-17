@@ -1296,12 +1296,12 @@ lemma computeHelper_bounds_base_rank_one_fixed
       rw [h_final_product_val]
       exact h_index_lt_dim
 
-  lemma product_extract_single_element_eq_getElem_bang (shape : Array Nat) (k : Nat)
-      (h_k_lt_size : k < shape.size) (h_kp1_le_size : k + 1 ≤ shape.size) :
-      (shape.extract k (k+1)).foldl (· * ·) 1 = shape[k]! := by
-    rw [← Array.foldl_toList, ← List.prod_eq_foldl]
-    rw [Array.extract_toList_eq_getElem_bang_cons_extract_toList shape k (k+1) (Nat.lt_succ_self _) h_kp1_le_size]
-    simp only [Array.extract_eq_nil_of_start_eq_end, Array.toList_empty, List.prod_cons, List.prod_nil, mul_one]
+lemma product_extract_single_element_eq_getElem_bang (shape : Array Nat) (k : Nat)
+    (h_k_lt_size : k < shape.size) (h_kp1_le_size : k + 1 ≤ shape.size) :
+    (shape.extract k (k+1)).foldl (· * ·) 1 = shape[k]! := by
+  rw [← Array.foldl_toList, ← List.prod_eq_foldl]
+  rw [Array.extract_toList_eq_getElem_bang_cons_extract_toList shape k (k+1) (Nat.lt_succ_self _) h_kp1_le_size]
+  simp only [Array.extract_eq_nil_of_start_eq_end, Array.toList_empty, List.prod_cons, List.prod_nil, mul_one]
 
 -- Connects the functional definition of computeHelper with its relational counterpart.
 lemma computeHelper_eq_ok_iff_rel
