@@ -1302,3 +1302,106 @@ lemma computeHelper_bounds_base_rank_one_fixed
     rw [← Array.foldl_toList, ← List.prod_eq_foldl]
     rw [Array.extract_toList_eq_getElem_bang_cons_extract_toList shape k (k+1) (Nat.lt_succ_self _) h_kp1_le_size]
     simp only [Array.extract_eq_nil_of_start_eq_end, Array.toList_empty, List.prod_cons, List.prod_nil, mul_one]
+
+-- Connects the functional definition of computeHelper with its relational counterpart.
+lemma computeHelper_eq_ok_iff_rel
+    {shape : Array Nat} {rank : Nat} {indices : Array Nat}
+    (h_shape_size_eq_rank : shape.size = rank)
+    (h_indices_size_eq_rank : indices.size = rank)
+    {i fir sa res : Nat} :
+    computeHelper shape rank indices i fir sa = Except.ok res ↔
+    ComputeHelperRel shape rank indices i fir sa res := by
+  constructor
+  · -- Forward direction: computeHelper -> rel
+    intro h_compute_ok_main 
+    induction' h_fuel : rank - i with current_fuel ih generalizing i fir sa res h_compute_ok_main
+    · -- Base case: rank - i = 0  => i >= rank
+      have h_i_ge_rank : i ≥ rank := Nat.le_of_sub_eq_zero h_fuel
+      unfold computeHelper at h_compute_ok_main
+      simp only [h_i_ge_rank, if_true] at h_compute_ok_main
+      rw [Except.ok.injEq] at h_compute_ok_main; subst res
+      exact ComputeHelperRel.tc i fir sa h_i_ge_rank
+    · -- Inductive step: rank - i = current_fuel + 1 => i < rank
+      have h_i_lt_rank : i < rank := Nat.lt_of_sub_eq_succ h_fuel
+      have h_rank_pos : rank > 0 := by
+        apply Nat.pos_of_ne_zero
+        intro h_rank_zero
+        rw [h_rank_zero] at h_i_lt_rank
+        exact Nat.not_lt_zero i h_i_lt_rank
+      let k_val := rank - 1 - i
+      have hk_val_lt_rank : k_val < rank := Nat.lt_of_le_of_lt (Nat.sub_le (rank - 1) i) (Nat.pred_lt_self h_rank_pos)
+      have hk_indices_bounds : k_val < indices.size := h_indices_size_eq_rank ▸ hk_val_lt_rank
+      have hk_shape_bounds : k_val < shape.size := h_shape_size_eq_rank ▸ hk_val_lt_rank
+      let current_idx_val_safe : Nat := indices[k_val]'hk_indices_bounds
+      let current_dim_val_safe : Nat := shape[k_val]'hk_shape_bounds
+      have h_get_bang_idx_eq_safe : indices[k_val]! = current_idx_val_safe := Array.getElem_eq_get! hk_indices_bounds
+      have h_get_bang_shape_eq_safe : shape[k_val]! = current_dim_val_safe := Array.getElem_eq_get! hk_shape_bounds
+      by_cases h_idx_bang_ge_dim_bang : indices[k_val]! ≥ shape[k_val]!
+      · -- Case 1: indices[k_val]! ≥ shape[k_val]! (Error case in computeHelper)
+        have h_error_branch_is_taken : Except.error (TensorError.indexOutOfBounds indices shape) = Except.ok res := by
+          simp (config := {zetaDelta := true}) [computeHelper, h_i_lt_rank, k_val, h_idx_bang_ge_dim_bang] at h_compute_ok_main
+          subst h_shape_size_eq_rank
+          simp_all [k_val, current_idx_val_safe, current_dim_val_safe]
+          split at h_compute_ok_main
+          next h =>
+            simp_all only [Nat.sub_eq_zero_of_le, self_eq_add_left, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false]
+          next h => simp_all only [not_le, reduceCtorEq]
+        cases h_error_branch_is_taken 
+      · -- Case 2: indices[k_val]! < shape[k_val]! (Recursive call case in computeHelper)
+        let next_fir_val := fir + indices[k_val]! * sa
+        let next_sa_val := sa * shape[k_val]!
+        have h_recursive_call_eq_ok : computeHelper shape rank indices (i + 1) next_fir_val next_sa_val = Except.ok res := by
+          unfold computeHelper at h_compute_ok_main
+          simp [
+            if_neg (Nat.not_le_of_lt h_i_lt_rank),
+            if_neg h_idx_bang_ge_dim_bang
+          ] at h_compute_ok_main
+          subst h_shape_size_eq_rank
+          simp_all [k_val, current_idx_val_safe, current_dim_val_safe, next_fir_val, next_sa_val]
+          split at h_compute_ok_main
+          next h => simp_all only [reduceCtorEq]
+          next h => simp_all only [not_le]        
+        have h_fuel_for_rec : rank - (i + 1) = current_fuel := by
+          rw [Nat.sub_succ, h_fuel]; exact Nat.pred_succ current_fuel
+        have h_iff_from_ih : (computeHelper shape rank indices (i+1) next_fir_val next_sa_val = Except.ok res) ↔ (ComputeHelperRel shape rank indices (i+1) next_fir_val next_sa_val res) :=  
+          (iff_true_right (ih h_recursive_call_eq_ok h_fuel_for_rec)).mpr h_recursive_call_eq_ok
+        have h_rec_call_rel : ComputeHelperRel shape rank indices (i+1) next_fir_val next_sa_val res :=
+          h_iff_from_ih.mp h_recursive_call_eq_ok
+        have h_idx_lt_dim_safe : current_idx_val_safe < current_dim_val_safe := by
+          rw [←h_get_bang_idx_eq_safe, ←h_get_bang_shape_eq_safe]
+          exact Nat.lt_of_not_ge h_idx_bang_ge_dim_bang
+        have h_next_fir_eq_safe : next_fir_val = fir + current_idx_val_safe * sa := by
+          simp only [h_get_bang_idx_eq_safe, next_fir_val]
+        have h_next_sa_eq_safe : next_sa_val = sa * current_dim_val_safe := by
+          simp only [h_get_bang_shape_eq_safe, next_sa_val, next_fir_val]
+        rw [h_next_fir_eq_safe, h_next_sa_eq_safe] at h_rec_call_rel
+        apply ComputeHelperRel.rs i fir sa (fir + current_idx_val_safe * sa) (sa * current_dim_val_safe) res
+        · exact h_i_lt_rank
+        · exact rfl
+        · rfl 
+        · exact h_get_bang_shape_eq_safe
+        · exact Nat.lt_of_lt_of_eq h_idx_lt_dim_safe (id (Eq.symm h_get_bang_shape_eq_safe))
+        · exact rfl
+        · exact id (Eq.symm h_next_sa_eq_safe)
+        · exact h_rec_call_rel
+  · -- Backward direction: rel -> computeHelper
+    intro h_rel
+    induction h_rel with
+    | tc i fir sa h_term =>
+      unfold computeHelper
+      simp [h_term]
+    | rs i fir sa newFir newSa res h_not_term k_val h_k_def hk_idx_lt_idx_size hk_idx_lt_shape_size idx_val h_idx_eq dim_val h_dim_eq h_bound h_newFir_def h_newSa_def h_recursive_call ih_rec =>
+      unfold computeHelper
+      rw [if_neg (Nat.not_le_of_lt h_not_term)] 
+      simp (config := {zetaDelta := true}) only [
+        ←h_k_def, 
+        Array.getElem_eq_get! hk_idx_lt_idx_size, 
+        Array.getElem_eq_get! hk_idx_lt_shape_size, 
+        ←h_idx_eq, 
+        ←h_dim_eq, 
+        Nat.not_le_of_lt h_bound, 
+        if_false, 
+        ←h_newFir_def, 
+        ←h_newSa_def 
+      ]
+      exact ih_rec
