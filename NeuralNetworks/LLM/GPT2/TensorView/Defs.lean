@@ -239,7 +239,7 @@ inductive ComputeHelperRel (shape : Array Nat) (rank : Nat) (indices : Array Nat
     (h_recursive_call : ComputeHelperRel shape rank indices (i+1) newFir newSa res) :
     ComputeHelperRel shape rank indices i fir sa res
 
-/-- Auxiliary predicate: Can a call at (i_rev, fir, sa) reach the terminal state (rank, fir_term, sa_term)
+/-/- Auxiliary predicate: Can a call at (i_rev, fir, sa) reach the terminal state (rank, fir_term, sa_term)
     with a final result of fir_term, without erroring? -/
 inductive CanReachTerminal (shape : Array Nat) (rank : Nat) (indices : Array Nat) :
   (i_rev : Nat) → (fir : Nat) → (sa : Nat) → (fir_terminal : Nat) → Prop where
@@ -256,7 +256,7 @@ inductive CanReachTerminal (shape : Array Nat) (rank : Nat) (indices : Array Nat
        (h_fir_next_def : fir_next = fir_curr + idx_val * sa_curr)
        (h_sa_next_def : sa_next = sa_curr * dim_val)
        (h_can_reach_from_next : CanReachTerminal shape rank indices (i_rev + 1) fir_next sa_next fir_target_term)
-  : CanReachTerminal shape rank indices i_rev fir_curr sa_curr fir_target_term
+  : CanReachTerminal shape rank indices i_rev fir_curr sa_curr fir_target_term --/
 
 /--
 Computes the flat (1D) index from a multi-dimensional `indices` array for a tensor
