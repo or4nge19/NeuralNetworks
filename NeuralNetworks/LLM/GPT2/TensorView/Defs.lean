@@ -144,6 +144,22 @@ def validateShape (shape : Array Nat) : Except TensorError (Nat × (Nat → Prop
     -- Return the rank and a predicate that validates indices
     return Except.ok (rank, fun i => i < rank → shape[i]! > 0)
 
+/--
+A recursive helper for `validateShapeRec`.
+Checks dimensions from `idx` onwards.
+Returns `Except.ok ()` if all dimensions from `idx` are positive.
+Returns `Except.error` if a zero dimension is found.
+-/
+def validateShapeLoopRec (shape : Array Nat) (idx : Nat) : Except TensorError Unit :=
+  if h_idx_lt_size : idx < shape.size then
+    if shape[idx]! == 0 then
+      Except.error (TensorError.negativeDimension shape)
+    else
+      validateShapeLoopRec shape (idx + 1)
+  else
+    Except.ok () -- All checked dimensions were positive
+termination_by shape.size - idx
+
 /-- Creates a TensorView assuming validation and checks passed during buffer construction. -/
 @[inline]
 def TensorView.mkUnsafe (s : Type) (shape : Array Nat) (rank : Nat) (storageRef : ST.Ref s ByteArray)
