@@ -397,10 +397,7 @@ def TensorView.get? {s : Type} (tv : TensorView s) (indices : Array Nat)
       match LLM.GPT2.ByteArray.readFloatLE? storage byteIndexAbs with
       | some val => return Except.ok val
       | none =>
-          -- This case *should* be impossible if h_read_in_storage holds and readFloatLE? is correct.
-          -- Indicates an internal inconsistency or bug in readFloatLE?.
           panic! "Internal error: readFloatLE? failed despite bounds proof"
-
 
 /--
 Sets a `Float` value at the specified `indices` within the `TensorView`.
@@ -437,3 +434,5 @@ def TensorView.set! {s : Type} (tv : TensorView s) (indices : Array Nat) (value 
         LLM.GPT2.ByteArray.writeFloatLE! storage byteIndexAbs value
       )
       return Except.ok ()
+
+end LLM.GPT2

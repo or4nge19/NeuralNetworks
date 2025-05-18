@@ -6,5 +6,7 @@ import NeuralNetworks.Hopfield.StochasticUpdate
 import NeuralNetworks.Hopfield.Asymmetric
 import NeuralNetworks.LLM.GPT2.ByteArrayUtils
 import NeuralNetworks.LLM.GPT2.Core
+import NeuralNetworks.LLM.GPT2.Model
 import NeuralNetworks.LLM.GPT2.TensorView.Defs
+import NeuralNetworks.LLM.GPT2.TensorView.ComputeBounds
 import NeuralNetworks.LLM.GPT2.TensorView.Lemmas
