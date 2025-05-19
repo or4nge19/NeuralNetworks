@@ -8,7 +8,7 @@ open Decidable
 
 namespace LLM.GPT2
 
---  Section 1: Core Constants and Types 
+--  Section 1: Core Constants and Types
 
 /-- Number of bytes used to represent a Float value (64-bit double). -/
 @[inline]
@@ -34,6 +34,6 @@ inductive TensorError where
   | bufferSizeNotDivisible (size : Nat) (divisor : Nat) : TensorError
   | writeOutOfBounds (absByteIndex : Nat) (viewOffsetBytes: Nat)
     (viewSizeBytes : Nat) (storageSize : Nat) : TensorError
-  deriving Repr
+  deriving Repr, DecidableEq
 
 end LLM.GPT2
