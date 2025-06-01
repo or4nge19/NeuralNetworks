@@ -4,6 +4,8 @@
 
 This project contains a Lean 4 formalization of Hopfield networks. Hopfield networks are a type of recurrent artificial neural network that serve as content-addressable memory systems. This repository includes comprehensive structures and proofs pertaining to Hopfield networks.
 
+### A more up to date development of this material is at https://github.com/mkaratarakis/HopfieldNet ####
+
 ### Features
 
 - **SpinState**: Represents a binary spin, either up or down, and supports conversion to real numbers, Boolean values, and ZMod 2.
