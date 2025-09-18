@@ -41,43 +41,26 @@ lemma bilin_diag_zero_single_component {M : Matrix (Fin n) (Fin n) ℝ}
     (h_diag : Matrix.diag M = 0) (v : Fin n → ℝ) (i : Fin n)
     (h_single : ∀ j : Fin n, j ≠ i → v j = 0) :
     Matrix.toBilin' M v v = 0 := by
-  -- Expand the bilinear form definition
   have h_bilin_sum : Matrix.toBilin' M v v = ∑ j, ∑ k, M j k * v j * v k := by
     unfold Matrix.toBilin'
-    -- Use the definition of bilinear form
     simp only [LinearMap.BilinForm.toMatrix'_symm]
-
-    -- Expand the sum explicitly
     rw [Matrix.toBilin'_apply']
-    --simp only [Matrix.dotProduct, Fin.sum_univ_eq_sum_range]
-
-    -- Convert dot product to sum using simp only
     simp only [dotProduct]
-    -- Expand matrix-vector multiplication
     simp only [Matrix.mulVec, dotProduct]
-
-    -- Rewrite nested sums
     have h1 : ∀ (j : Fin n), (∑ k, (M j k * v k)) * v j = ∑ k, M j k * v j * v k := by
       intro j
       rw [@Finset.sum_mul]
       apply Finset.sum_congr rfl
       intro k _
       ring
-
     apply Finset.sum_congr rfl
     intro j _
-    -- Rewrite the goal to match the form in h1
     have : v j * ∑ x, M j x * v x = (∑ k, M j k * v k) * v j := by
       rw [mul_comm]
-
     rw [this]
     exact h1 j
-
-  -- Since v has only one non-zero component at index i,
-  -- the only relevant term in the sum is M i i * v i * v i
   have h_sum_eq : ∑ j, ∑ k, M j k * v j * v k = M i i * v i * v i := by
     dsimp only [Finset.sum_pos, Finset.univ_sum_single]
-
     calc ∑ j ∈ Finset.univ, ∑ k ∈ Finset.univ, M j k * v j * v k
       = ∑ j ∈ Finset.univ, if j = i then ∑ k ∈ Finset.univ, M j k * v j * v k else 0 := by
           apply Finset.sum_congr rfl
@@ -101,8 +84,6 @@ lemma bilin_diag_zero_single_component {M : Matrix (Fin n) (Fin n) ℝ}
       _ = M i i * v i * v i := by
         simp only [Finset.sum_ite, Finset.filter_eq', Finset.mem_univ, if_true]
         simp only [Finset.sum_singleton, Finset.sum_const_zero, add_zero]
-
-  -- The diagonal of M is zero by assumption
   calc Matrix.toBilin' M v v
     = ∑ j, ∑ k, M j k * v j * v k := h_bilin_sum
     _ = M i i * v i * v i := h_sum_eq
@@ -118,28 +99,20 @@ lemma bilin_with_single_component {M : Matrix (Fin n) (Fin n) ℝ}
     (x δ : Fin n → ℝ) (i : Fin n)
     (h_single : ∀ j : Fin n, j ≠ i → δ j = 0) :
     Matrix.toBilin' M x δ = δ i * (M.mulVec x) i := by
-  -- Expand the bilinear form definition
   have h_bilin_sum : Matrix.toBilin' M x δ = ∑ j ∈ Finset.univ, ∑ k ∈ Finset.univ, M j k * x j * δ k := by
     unfold Matrix.toBilin'
     simp only [LinearMap.BilinForm.toMatrix'_symm]
     rw [Matrix.toBilin'_apply']
     simp only [dotProduct, Matrix.mulVec]
-
-    -- Convert nested sums
     have h_sum : ∀ j, x j * (∑ k, M j k * δ k) = ∑ k, M j k * x j * δ k := by
       intro j
       rw [@Finset.mul_sum]
       apply Finset.sum_congr rfl
       intro k _
       ring
-
-    -- Apply transformation to entire sum
     apply Finset.sum_congr rfl
     intro j _
     exact h_sum j
-
-  -- Since δ has only one non-zero component at index i,
-  -- we simplify the sum
   have h_sum_eq : ∑ j ∈ Finset.univ, ∑ k ∈ Finset.univ, M j k * x j * δ k =
                   ∑ j ∈ Finset.univ, M j i * x j * δ i := by
     apply Finset.sum_congr rfl
@@ -149,17 +122,13 @@ lemma bilin_with_single_component {M : Matrix (Fin n) (Fin n) ℝ}
       rw [h_single k h_ne, mul_zero]
     · intro a
       simp_all only [ne_eq, Finset.mem_univ, not_true_eq_false]
-
-  -- Further simplify using the definition of matrix-vector multiplication
   calc Matrix.toBilin' M x δ
     = ∑ j ∈ Finset.univ, ∑ k ∈ Finset.univ, M j k * x j * δ k := h_bilin_sum
     _ = ∑ j ∈ Finset.univ, M j i * x j * δ i := h_sum_eq
     _ = (∑ j ∈ Finset.univ, M j i * x j) * δ i := by
         rw [@Finset.sum_mul]
     _ = ((Matrix.transpose M).mulVec x) i * δ i := by
-        -- Definition of matrix-vector multiplication
         have h_mul_vec_transpose : ((Matrix.transpose M).mulVec x) i = ∑ j ∈ Finset.univ, (Matrix.transpose M) i j * x j := rfl
-        -- Use transpose definition to convert our sum
         have h_transpose : ∑ j ∈ Finset.univ, M j i * x j = ∑ j ∈ Finset.univ, (Matrix.transpose M) i j * x j := by
           apply Finset.sum_congr rfl
           intro j _hj
@@ -167,9 +136,7 @@ lemma bilin_with_single_component {M : Matrix (Fin n) (Fin n) ℝ}
         rw [h_transpose, h_mul_vec_transpose]
     _ = ((Matrix.transpose M).mulVec x) i * δ i := by
         have h_eq_transpose : (Matrix.transpose M) = M := by
-          -- Since we're working with Hopfield networks, weights are symmetric
           ext i j
-          -- For symmetric matrix, (Matrix.transpose M) i j = M j i and h_symm gives M j i = M i j
           rw [Matrix.transpose_apply]
           unfold Matrix.IsSymm at h_symm
           exact congrFun (congrFun (id (Eq.symm h_symm)) j) i
@@ -187,10 +154,7 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
     (h_diff_i : ∀ j : Fin n, j ≠ i → x' j = x j) :
     Matrix.toBilin' M x' x' - Matrix.toBilin' M x x =
     2 * (x' i - x i) * (M.mulVec x) i := by
-  -- Define the difference vector
   let δ : Fin n → ℝ := fun j => if j = i then x' i - x i else 0
-
-  -- Express x' in terms of x and δ
   have h_x'_eq : x' = fun j => x j + δ j := by
     ext j
     by_cases hj : j = i
@@ -198,8 +162,6 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
       simp [δ]
     · simp [δ, hj]
       rw [h_diff_i j hj]
-
-  -- Expand using bilinearity
   have h_bilin_expand : Matrix.toBilin' M x' x' =
                         Matrix.toBilin' M x x +
                         Matrix.toBilin' M x δ +
@@ -215,7 +177,6 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
                       a x * (∑ x_1, M x x_1 * c x_1) + b x * (∑ x_1, M x x_1 * c x_1) := by
           intro x
           rw [add_mul]
-
         rw [← Finset.sum_add_distrib]
         apply Finset.sum_congr rfl
         intro x _
@@ -223,61 +184,40 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
     have h_add2 : ∀ a b c, Matrix.toBilin' M a (fun i => b i + c i) =
                           Matrix.toBilin' M a b + Matrix.toBilin' M a c := by
       intro a b c
-      -- Use the definition of bilinear form
       simp only [Matrix.toBilin'_apply']
       simp only [dotProduct, Matrix.mulVec]
-
-      -- Use distributivity of dot product over addition
       have h_sum : ∀ x, ∑ j, M x j * (b j + c j) = ∑ j, M x j * b j + ∑ j, M x j * c j := by
         intro x
         rw [← Finset.sum_add_distrib]
         apply Finset.sum_congr rfl
         intro j _
         exact mul_add (M x j) (b j) (c j)
-
-      -- Apply distribution for each term in the outer sum
       have h_each_term : ∀ x, a x * ∑ j, M x j * (b j + c j) =
                              a x * ∑ j, M x j * b j + a x * ∑ j, M x j * c j := by
         intro x
         rw [h_sum x]
         exact mul_add (a x) _ _
-
-      -- Apply to the entire sum
       apply Eq.trans
       · apply Finset.sum_congr rfl
         intro x _
         exact h_each_term x
       · exact Finset.sum_add_distrib
-
     rw [h_add1 x δ (fun j ↦ x j + δ j)]
     rw [h_add2 x x δ]
     rw [h_add2 δ x δ]
     ring
-
-  -- The quadratic term δ'*M*δ is zero due to the zero diagonal
   have h_δ_quad_zero : Matrix.toBilin' M δ δ = 0 := by
     apply bilin_diag_zero_single_component h_diag δ i
     intro j hj
     simp [δ, hj]
-
-  -- By symmetry, the bilinear terms are equal
   have h_bilin_symm : Matrix.toBilin' M x δ = Matrix.toBilin' M δ x := by
-    -- For symmetric matrices, the bilinear form is symmetric
-    -- Use the direct property for symmetric bilinear forms
     have h_matrix_symm : Matrix.IsSymm M := h_symm
-
-    -- Use the property that for symmetric matrices, the bilinear form is symmetric
     unfold Matrix.toBilin'
     simp only [LinearMap.BilinForm.toMatrix'_symm]
-
-    -- Express the property in terms of the inner product
     have h_symm_inner : x ⬝ᵥ (M.mulVec δ) = δ ⬝ᵥ (M.mulVec x) := by
-      -- For a symmetric matrix M = Mᵀ, we have x ⬝ᵥ (M.mulVec δ) = δ ⬝ᵥ (M.mulVec x)
       have h_transpose_eq : Matrix.transpose M = M := by
         ext i j
         exact congrFun (congrFun h_matrix_symm i) j
-
-      -- Use properties of the dot product and symmetry
       calc x ⬝ᵥ (M.mulVec δ)
         = ∑ i, x i * (M.mulVec δ) i := by simp [dotProduct]
         _ = ∑ i, x i * (∑ j, M i j * δ j) := by simp [Matrix.mulVec]; exact rfl
@@ -294,13 +234,11 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
             intro j _
             apply Finset.sum_congr rfl
             intro i _
-            -- Use matrix symmetry: M j i = M i j
             have h_symm_at_ij : M j i = M i j := by
               rw [← h_transpose_eq]
               exact congrFun (congrFun h_symm j) i
             rw [h_symm_at_ij]
             ring
-
         _ = ∑ j, δ j * (∑ i, M j i * x i) := by
             apply Finset.sum_congr rfl
             intro j _
@@ -312,17 +250,12 @@ lemma bilin_diff_single_update {M : Matrix (Fin n) (Fin n) ℝ}
             exact h_factor
         _ = ∑ j, δ j * (M.mulVec x) j := by simp [Matrix.mulVec]; exact rfl
         _ = δ ⬝ᵥ (M.mulVec x) := by simp [dotProduct]
-
-    -- Connect the bilinear form to the dot product
     rw [Matrix.toBilin'_apply', Matrix.toBilin'_apply']
     exact h_symm_inner
-  -- The bilinear term simplifies using our earlier lemma
   have h_bilin_simple : Matrix.toBilin' M x δ = δ i * (M.mulVec x) i := by
     apply bilin_with_single_component h_symm x δ i
     intro j hj
     simp [δ, hj]
-
-  -- Putting it all together
   calc Matrix.toBilin' M x' x' - Matrix.toBilin' M x x
     = Matrix.toBilin' M x x + Matrix.toBilin' M x δ +
       Matrix.toBilin' M δ x + Matrix.toBilin' M δ δ -
@@ -345,8 +278,6 @@ lemma sum_diff_single_point {α : Type*} [Fintype α] (f g : α → ℝ) (i : α
     ∑ j, f j - ∑ j, g j = f i - g i := by
   have h_diff_sum : ∑ j, f j - ∑ j, g j = ∑ j, (f j - g j) := by
     rw [Finset.sum_sub_distrib]
-
-  -- Only the i-th term can be non-zero in the difference
   have h_sum_eq : ∑ j, (f j - g j) = f i - g i := by
     apply Finset.sum_eq_single i
     · intro j _hj h_ne
@@ -354,9 +285,7 @@ lemma sum_diff_single_point {α : Type*} [Fintype α] (f g : α → ℝ) (i : α
       simp
     · intro h_absurd
       exact False.elim (h_absurd (Finset.mem_univ i))
-
   rw [h_diff_sum, h_sum_eq]
-
 
 /-- Calculates the energy difference when flipping a single spin in a Hopfield network.
 
@@ -384,40 +313,28 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
   let W := weightsMatrix net
   let xVec := toRealVector x
   let x'Vec := toRealVector x'
-
   have h_symm : Matrix.IsSymm W := weights_symmetric net
   have h_diag : Matrix.diag W = 0 := weights_diag_zero net
-
   have h_diff_i : ∀ j, j ≠ i → x'Vec j = xVec j := by
     intro j hj
-    -- Use the hypothesis h_diff to establish that x' j = x j
     have h_states_eq_at_j : x' j = x j := h_diff j hj
-    -- Connect the equality of states to equality of real vectors
     simp [x'Vec, xVec, toRealVector]
-    -- Apply the equality of states
     rw [h_states_eq_at_j]
-
-
   have h_bilin_diff : Matrix.toBilin' W x'Vec x'Vec - Matrix.toBilin' W xVec xVec =
     2 * (x'Vec i - xVec i) * (W.mulVec xVec i) := by
       apply bilin_diff_single_update h_symm h_diag xVec x'Vec i h_diff_i
-
   have h_threshold_diff :
     (∑ j : Fin n, net.thresholds j * x'Vec j) - (∑ j : Fin n, net.thresholds j * xVec j) =
     net.thresholds i * (x'Vec i - xVec i) := by
-      -- First convert to sum of differences
       have h_sum_diff : ∑ j : Fin n, net.thresholds j * x'Vec j - ∑ j : Fin n, net.thresholds j * xVec j =
                         ∑ j : Fin n, (net.thresholds j * x'Vec j - net.thresholds j * xVec j) := by
         rw [Finset.sum_sub_distrib]
       rw [h_sum_diff]
-
-      -- Then use the fact that only at position i are the terms different
       have h_term_eq : ∀ (j : Fin n), j ≠ i →
           net.thresholds j * x'Vec j - net.thresholds j * xVec j = 0 := by
         intro j hj
         rw [h_diff_i j hj]
         simp
-
       have h_eq_single : ∑ j : Fin n, (net.thresholds j * x'Vec j - net.thresholds j * xVec j) =
                           net.thresholds i * x'Vec i - net.thresholds i * xVec i := by
         apply Finset.sum_eq_single i
@@ -425,16 +342,10 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
           exact h_term_eq j hj_ne
         · intro h_false
           exact False.elim (h_false (Finset.mem_univ i))
-
       have h_factor : net.thresholds i * x'Vec i - net.thresholds i * xVec i =
                      net.thresholds i * (x'Vec i - xVec i) := by
         ring
-
       rw [h_eq_single, h_factor]
-
-      -- Simplify the expression at position i
-
-  -- Substitute the lemmas about bilinear form and threshold differences
   have h_energy_diff :
     energy net x' - energy net x =
     -1/2 * ((Matrix.toBilin' W) x'Vec x'Vec - ((Matrix.toBilin' W) xVec xVec)) -
@@ -442,8 +353,6 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
     unfold energy
     simp only [W, xVec, x'Vec]
     ring
-
-  -- Apply our previous lemmas about the differences
   calc energy net x' - energy net x
     = -1/2 * ((Matrix.toBilin' W) x'Vec x'Vec - ((Matrix.toBilin' W) xVec xVec)) -
       (∑ j, net.thresholds j * x'Vec j - ∑ j, net.thresholds j * xVec j) := h_energy_diff
@@ -458,36 +367,20 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
         rw [@sub_neg_eq_add]
     _ = -((x' i).toReal - (x i).toReal) * (W.mulVec xVec i + net.thresholds i) := by
         simp only [x'Vec, xVec, toRealVector]
-
     _ = -((x' i).toReal - (x i).toReal) * localField net x i := by
-        -- We need to connect the expression with localField definition
         unfold localField
         simp [W, xVec]
-
-        -- First establish that the mulVec expressions match
         have h_mulvec_eq : W.mulVec xVec i = W.mulVec x.toRealVector i := by rfl
         rw [h_mulvec_eq]
-
-        -- Now handle the sign of the threshold term
-        -- The key insight: we need to use localField's definition with correct sign
         have h_local_field_rewrite : localField net x i = W.mulVec x.toRealVector i - net.thresholds i := by rfl
-
-        -- The two expressions differ by 2*net.thresholds i
         have h_eq_with_correction : W.mulVec x.toRealVector i + net.thresholds i =
                                     localField net x i + 2*net.thresholds i := by
           rw [h_local_field_rewrite]
           ring_nf
-
-        -- Handle the sign difference directly without assuming thresholds are zero
-
         have h_eq : W.mulVec x.toRealVector i + net.thresholds i = localField net x i + 2*net.thresholds i := by
           rw [h_local_field_rewrite]
           ring_nf
-
-        -- Using definition of localField
         have h_local_field_def : localField net x i = W.mulVec x.toRealVector i - net.thresholds i := rfl
-
-        -- With zero thresholds, the expressions are equal
         rw [h_threshold_zero] at h_local_field_def ⊢
         simp at h_local_field_def ⊢
 
@@ -523,140 +416,88 @@ lemma energy_decreases_on_update_with_inconsistent_signs
     energy net (updateState net x i) < energy net x := by
   let x' := updateState net x i
   let lf := localField net x i
-
   have h_diff_j : ∀ j : Fin n, j ≠ i → x' j = x j :=
     fun j hj => Function.update_of_ne hj _ _
-
   have h_energy_diff := energy_diff_single_flip net x i h_threshold_zero x' h_diff_j
-
   have h_lf_nonzero : lf ≠ 0 := by
     intro h_zero
     have : (x i).toReal * 0 < 0 := by rw [← h_zero]; exact lt_of_lt_of_eq h_inconsistent (id (Eq.symm h_zero))
     simp at this
-
   by_cases h_pos : 0 < lf
   · -- Case: local field is positive
-    -- By the inconsistency condition, x i must be down (-1)
     have h_x_is_down : x i = SpinState.down := by
         cases h : x i with
         | down => rfl
         | up =>
           have h_up_real : (x i).toReal = 1 := by rw [h]; rfl
-
           have h_lf_neg : lf < 0 := by
             rw [h_up_real] at h_inconsistent
             rw [one_mul] at h_inconsistent
             exact h_inconsistent
-
-          -- This contradicts h_pos : 0 < lf
           exact absurd h_lf_neg (not_lt_of_gt h_pos)
-
     have h_x'_is_up : x' i = SpinState.up := by
       change updateState net x i i = SpinState.up
       unfold updateState
       simp
-      -- When local field is positive, we flip from down to up
       have : lf > 0 := h_pos
       simp [this, h_x_is_down]
       exact h_pos
-
-    -- Calculate the energy difference directly
     have h_diff_simplified : energy net x' - energy net x < 0 := by
-      -- Start with the energy difference formula
       rw [h_energy_diff]
-
-      -- Substitute the values for up and down states
       have h1 : (x' i).toReal - (x i).toReal = 1 - (-1) := by
         rw [h_x'_is_up, h_x_is_down]
         simp [SpinState.toReal]
-
       have h2 : 1 - (-1) = 2 := by ring
-
-      -- Simplify the expression
       rw [h1]
-
-      -- Calculate the result directly
       have : -(1 - (-1)) * lf = -(2 * lf) := by
         rw [@eq_neg_iff_add_eq_zero]
         ring_nf
-
-      -- Now we have -(2 * lf) < 0, which is true when lf > 0
       have h3 : -(2 * lf) < 0 := by
         suffices 2 * lf > 0 by exact neg_neg_iff_pos.mpr this
         apply mul_pos
         · norm_num
         · exact h_pos
-
-      -- Apply our calculation
       rw [this]
-
-      -- We need to show -(2 * lf) < 0
       exact h3
-
-    -- Complete the proof for this case
     exact sub_neg.mp h_diff_simplified
-
   · -- Case: local field is negative or zero
     push_neg at h_pos
     have h_neg : lf < 0 := by
       apply lt_of_le_of_ne
       · exact h_pos
       · exact h_lf_nonzero
-
-    -- By the inconsistency condition, x i must be up (1)
     have h_x_is_up : x i = SpinState.up := by
       cases h : x i with
       | up => rfl
       | down =>
         have h_down_real : (x i).toReal = -1 := by rw [h]; rfl
-        -- When x i is down (-1) and lf < 0, their product is positive
         have h_prod_pos : (x i).toReal * lf > 0 := by
           apply mul_pos_of_neg_of_neg
           · rw [h_down_real]; norm_num
           · exact h_neg
-        -- When x i is down (-1) and lf < 0, their product is positive,
-        -- which contradicts h_inconsistent
         rw [h_down_real] at h_inconsistent
         have h_contra := not_lt_of_gt h_prod_pos
-        -- Rewrite h_inconsistent to match the form needed
         have h_inconsistent' : (x i).toReal * lf < 0 := by
           rw [h_down_real]
           exact h_inconsistent
         exact False.elim (h_contra h_inconsistent')
-
-    -- The update must flip to down (-1)
     have h_x'_is_down : x' i = SpinState.down := by
       change updateState net x i i = SpinState.down
       unfold updateState
       simp
       simp_all only [ne_eq, neg_sub, ↓reduceIte,
         ite_eq_right_iff, reduceCtorEq, imp_false, not_lt, x', lf]
-
-    -- Calculate the energy difference directly
     have h_diff_simplified : energy net x' - energy net x < 0 := by
-      -- Start with the energy difference formula
       rw [h_energy_diff]
-
-      -- Substitute the values for up and down states
       have h1 : (x' i).toReal - (x i).toReal = (-1) - 1 := by
         rw [h_x'_is_down, h_x_is_up]
         simp [SpinState.toReal]
-
       have h2 : (-1) - 1 = -2 := by ring
-
-      -- Simplify the expression
       rw [h1]
-
-      -- Distribute the negative
       have h3 : -(-2 * lf) = 2 * lf := by ring
-      --rw [h3]
-
-      -- Now we have 2 * lf < 0, which is true when lf < 0
       apply mul_neg_of_pos_of_neg
       · norm_num
       · exact h_neg
-
-    -- Complete the proof for this case
     exact sub_neg.mp h_diff_simplified
 
 /-!
@@ -675,7 +516,6 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
     (h_threshold_zero : net.thresholds i = 0) :
     energy net (updateState net x i) ≤ energy net x := by
   let lf := localField net x i
-
   by_cases h_inconsistent : (x i).toReal * lf < 0
   · exact le_of_lt (energy_decreases_on_update_with_inconsistent_signs net x i h_threshold_zero h_inconsistent)
   · push_neg at h_inconsistent
@@ -685,40 +525,31 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
     have h_energy_diff := energy_diff_single_flip net x i h_threshold_zero x' h_diff_j
     by_cases h_lf_zero : lf = 0
     · simp at h_energy_diff
-      -- When local field is zero, the energy difference is zero
       have h_energies_equal : energy net x' = energy net x := by
         rw [← sub_eq_zero]
         rw [h_energy_diff]
         simp [mul_zero]
         rw [← h_lf_zero]
         exact AffineMap.lineMap_eq_lineMap_iff.mp rfl
-
-      -- Since x' is the updated state
       have h_x'_eq : x' = updateState net x i := rfl
       rw [h_energies_equal]
-
     · have h_same_sign : (x i).toReal = Real.sign lf := by
         cases h_x : x i with
         | down =>
           have h_xi_val : (x i).toReal = -1 := by rw [h_x]; rfl
-
           have h_lf_neg : lf < 0 := by
             have : -1 * lf ≥ 0 := by rw [← h_xi_val]; exact h_inconsistent
             have : lf ≤ 0 := by simpa using this
             exact lt_of_le_of_ne this h_lf_zero
-
           rw [← h_x]
           rw [h_xi_val]
           rw [← Real.sign_of_neg h_lf_neg]
-
         | up =>
           have h_xi_val : (x i).toReal = 1 := by rw [h_x]; rfl
-
           have h_lf_pos : lf > 0 := by
             have : 1 * lf ≥ 0 := by rw [← h_xi_val]; exact h_inconsistent
             have : lf ≥ 0 := by simpa using this
             exact lt_of_le_of_ne this (Ne.symm h_lf_zero)
-
           rw [← h_x, h_xi_val]
           exact Eq.symm (Real.sign_of_pos h_lf_pos)
       have h_x'_eq_x : x' = x := by
@@ -730,7 +561,6 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
           change updateState net ?_ ?_ ?_ = ?_
           unfold updateState
           simp
-          -- if lf > 0, then x j is up (1), and if lf < 0, then x j is down (-1)
           have h1 : lf > 0 ∨ lf < 0 := by exact lt_or_gt_of_ne fun a ↦ h_lf_zero (id (Eq.symm a))
           cases h1 with
           | inl h_pos =>
@@ -759,12 +589,9 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
             exact le_of_lt h_neg
         else
           rw [h_diff_j j h]
-
-      -- Since x' = x and x' = updateState net x i, we have updateState net x i = x
       rw [← h_x'_eq_x]
       rw [h_x'_eq_x]
       exact le_of_eq (congrArg (energy net) h_x'_eq_x)
-
 
 /-
 **Main Theorem: Energy monotonically decreases during network updates**
@@ -851,47 +678,29 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
     (y : HopfieldState n) (i : Fin n)
     (h_diff_only_i : ∀ (j : Fin n), j ≠ i → y j = x j) :
     energy net x ≤ energy net y := by
-
-  -- Get the local field at position i
   let lf := localField net x i
-
-  -- Using the fixed point property: updateState net x i = x
   have h_update_eq_x : updateState net x i = x := by
     exact h_fixed i
-
-  -- Apply the energy difference formula
   have h_energy_diff : energy net y - energy net x =
       -((y i).toReal - (x i).toReal) * lf := by
     exact energy_diff_single_flip net x i (h_zero_thresholds i) y h_diff_only_i
-
-  -- Case analysis on the states of x and y at position i
   by_cases h_x_up : x i = SpinState.up
   · -- Case: x i = up
     by_cases h_y_up : y i = SpinState.up
     · -- Case: x i = up, y i = up
-      -- No difference in energy if they're the same at position i
       rw [h_y_up, h_x_up] at h_energy_diff
       simp at h_energy_diff
-
-      -- Since x is a fixed point: updateState net x i = x
       have h_update_eq_x' : updateState net x i = x := h_update_eq_x
-
-      -- Therefore: energy net (updateState net x i) = energy net x
       have h_energy_eq : energy net (updateState net x i) = energy net x := by
         rw [h_update_eq_x']
-
-      -- From h_energy_diff: energy net y = energy net x
       have h_energy_y_eq_x : energy net y = energy net x := by
         dsimp only
         rw [sub_eq_zero] at h_energy_diff
         exact h_energy_diff
-
-      -- Combine the equalities to get the desired inequality
       rw [← h_fixed i]
       rw [h_fixed]
       exact le_of_eq (id (Eq.symm h_energy_y_eq_x))
     · -- Case: x i = up, y i = down
-      -- Get the real values for these states
       have h_x_real : (x i).toReal = 1 := by
         cases h : x i
         case down =>
@@ -899,27 +708,17 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
             rw [← h_x_up, h]
           simp_all only [ne_eq, neg_sub, reduceCtorEq, lf]
         case up => rfl
-
-      -- Since y i is not up (h_y_up), it must be down
       have h_y_down : y i = SpinState.down := by
         have h_y_not_up : ¬ y i = SpinState.up := h_y_up
         cases h : y i
         case down => rfl
         case up => contradiction
-
       have h_y_real : (y i).toReal = -1 := by
         rw [h_y_down]
         rfl
-
-      -- Since x is a fixed point, the local field at i must have a sign consistent with x i
       have h_consistent_sign : lf ≥ 0 := by
-        -- From the fixed point property, we know updateState doesn't change x i
         unfold updateState at h_update_eq_x
         simp at h_update_eq_x
-        -- If updateState doesn't change x i from up, then either:
-        -- 1) lf > 0 (which would set it to up), or
-        -- 2) lf = 0 (which would leave it unchanged)
-        -- In either case, lf ≥ 0
         by_cases h_lf_pos : 0 < lf
         · exact le_of_lt h_lf_pos
         · push_neg at h_lf_pos
@@ -930,8 +729,6 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
               simp [h_lf_neg]
               simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
                 ite_eq_right_iff, imp_false, not_lt, lf]
-
-            -- The update should have flipped the spin to down
             have h_update_down : updateState net x i i = SpinState.down := by
               unfold updateState
               simp [h_lf_neg]
@@ -939,57 +736,37 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
               rw [← h_zero_thresholds i]
               simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
                 Function.update_self, ite_self, ite_eq_right_iff, imp_false, not_lt, lf]
-
-            -- But x i is up, so updateState net x i i ≠ x i
             have h_neq : updateState net x i i ≠ x i := by
               rw [h_x_up]
               rw [h_update_down]
               simp
-
-            -- This contradicts the assumption that x is a fixed point
             have h_contra : updateState net x i = x := h_update_eq_x
             have h_contra' : updateState net x i i = x i := by
               rw [h_fixed]
             exact False.elim (h_neq h_contra')
-
           · -- If not lf < 0 and not 0 < lf, then lf = 0
             push_neg at h_lf_neg
             exact h_lf_neg
-
-      -- Substitute the real values into the energy difference
       rw [h_x_real, h_y_real] at h_energy_diff
-      -- Simplify: -(-1 - 1) * lf = -((-2) * lf) = 2 * lf
       have h_diff_simplified : energy net y - energy net x = 2 * lf := by
         simp at h_energy_diff
         rw [h_energy_diff]
         ring
-
-      -- Since lf ≥ 0 and we have 2 * lf, the difference is non-negative
       have h_energy_y_ge_x : energy net y - energy net x ≥ 0 := by
         rw [h_diff_simplified]
         exact mul_nonneg (by norm_num) h_consistent_sign
-
-      -- Therefore, energy net x ≤ energy net y
       exact le_of_sub_nonneg h_energy_y_ge_x
-
   · -- Case: x i = down (not up)
     have h_x_down : x i = SpinState.down := by
       have h_x_not_up : ¬ x i = SpinState.up := h_x_up
       cases h : x i
       case down => rfl
       case up => contradiction
-
     by_cases h_y_up : y i = SpinState.up
     · -- Case: x i = down, y i = up
-      -- Similar reasoning as the previous case
       have h_x_real : (x i).toReal = -1 := by rw [h_x_down]; rfl
       have h_y_real : (y i).toReal = 1 := by rw [h_y_up]; rfl
-
-      -- Since x is a fixed point, the local field must have consistent sign with x i
       have h_consistent_sign : lf ≤ 0 := by
-        -- If x i stays down at a fixed point, then either:
-        -- 1) lf < 0 (which would set it to down), or
-        -- 2) lf = 0 (which would leave it unchanged)
         unfold updateState at h_update_eq_x
         simp at h_update_eq_x
         by_cases h_lf_neg : lf < 0
@@ -1006,33 +783,20 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
               intro a
               simp_all only [ne_eq, ite_self, up_down_diff, neg_mul, reduceCtorEq, not_false_eq_true,
                 not_true_eq_false, lf]
-
-
-            -- But we know x is a fixed point, so updateState net x i = x
             have h_contra : updateState net x i i = x i := by
               rw [h_fixed i]
-
-            -- And we know x i = down
             rw [h_x_down] at h_contra
-
-            -- This contradicts h_would_update
             have h_neq : SpinState.up ≠ SpinState.down := by simp
             rw [h_would_update] at h_contra
             exact False.elim (h_neq h_contra)
-
           · -- If not lf < 0 and not 0 < lf, then lf = 0
             push_neg at h_lf_pos
             exact h_lf_pos
-
-      -- Substitute the real values into the energy difference
       rw [h_x_real, h_y_real] at h_energy_diff
-      -- Simplify: -(1 - (-1)) * lf = -2 * lf
       have h_diff_simplified : energy net y - energy net x = -2 * lf := by
         simp at h_energy_diff
         rw [h_energy_diff]
         ring
-
-      -- Since lf ≤ 0 and we have -2 * lf, the difference is non-negative
       have h_energy_y_ge_x : energy net y - energy net x ≥ 0 := by
         rw [h_diff_simplified]
         simp only [neg_mul, ge_iff_le, Left.nonneg_neg_iff]
@@ -1042,31 +806,20 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
         constructor
         . norm_num
           simp_all only [ne_eq, neg_mul, sub_neg_eq_add, neg_add_rev, reduceCtorEq, not_false_eq_true, lf]
-
-      -- Therefore, energy net x ≤ energy net y
       exact le_of_sub_nonneg h_energy_y_ge_x
-
     · -- Case: x i = down, y i = down
-      -- No difference in energy if they're the same at position i
       have h_y_down : y i = SpinState.down := by
         cases h_y : y i
         case up =>
           contradiction
         case down =>
           rfl
-
       rw [h_y_down, h_x_down] at h_energy_diff
       simp at h_energy_diff
-
-      -- Since the energy difference is zero
       have h_energy_equal : energy net y = energy net x := by
         rw [sub_eq_zero] at h_energy_diff
         exact h_energy_diff
-
-      -- Use the fixed point property
       rw [← h_update_eq_x]
-
-      -- Since energy net y = energy net x and x is a fixed point
       rw [h_energy_equal]
       rw [← h_fixed i]
       exact energy_decreases_on_update net (updateState net x i) i (h_zero_thresholds i)
@@ -1118,7 +871,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
         simp [h_lf_ne]
         by_cases h_pos : 0 < localField net x i
         · exfalso
-          -- When local field is positive and state is up, updateState preserves the state
           have h_update_up : updateState net x i = x := by
             ext j
             by_cases h_j : j = i
@@ -1133,7 +885,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
             exact lt_of_le_of_ne h_pos h_lf_ne
           simp [h_neg]
           rw [← h_zero_thresholds i]
-          -- Show that the condition is false, so we get down
           have h_cond : ¬(net.thresholds i < localField net x i) := by
             rw [h_zero_thresholds i]
             simp
@@ -1149,7 +900,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
           rw [← h_zero_thresholds i]
           simp_all only [ne_eq, Function.update_self, reduceCtorEq]
         · -- Since local field is not positive and not zero (h_lf_ne),
-          -- it must be negative
           push_neg at h_pos
           exact lt_of_le_of_ne h_pos h_lf_ne
       simp_all only [ne_eq, one_mul]
@@ -1158,9 +908,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
       have h_update_up : updateState net x i = Function.update x i SpinState.up := by
         unfold updateState
         simp
-
-      -- Since updateState changes the state (h_update_ne) and x i is down,
-      -- we must have localField net x i > 0
         have h_lf_pos : 0 < localField net x i := by
           by_cases h_pos : 0 < localField net x i
           · exact h_pos
@@ -1185,8 +932,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
               have h_zero : localField net x i = 0 := by
                 exact le_antisymm h_pos h_neg
               contradiction
-
-        -- When local field is positive, updateState flips to up
         simp_all only [ne_eq, ↓reduceIte]
       have h_lf_pos : localField net x i > 0 := by
         have h_update_ne' : updateState net x i i ≠ x i := by
@@ -1213,25 +958,16 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
         have h_update_up' : updateState net x i i = SpinState.up := by
           unfold updateState
           simp
-
           rw [← h_x]
           simp
           by_cases h_lf_neg : localField net x i < 0
           · intro h_le
             exfalso
-            -- Local field is both less than zero and less than or equal to zero
             have h_contra := lt_of_le_of_ne h_le h_lf_ne
             have h_not_lf_neg : ¬(localField net x i < 0) := by
               have h_pos : 0 < localField net x i := by
                 push_neg at h_lf_neg
-                -- Since local field is not negative (h_lf_neg) and not zero (h_lf_ne),
-                -- it must be positive
-                -- This is a contradiction because we already know the field is negative
                 exfalso
-                -- We have both:
-                -- h_lf_neg : localField net x i < 0
-                -- h_update_ne : updateState net x i ≠ x
-                -- For a down state with negative field, updateState should not change it
                 have h_no_update : updateState net x i = x := by
                   ext j
                   by_cases h_j : j = i
@@ -1248,16 +984,11 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
             exact h_not_lf_neg h_lf_neg
           rw [h_x]
           simp
-          -- Since we've eliminated the negative case, and the local field is not zero (h_lf_ne),
-          -- it must be positive
           push_neg at h_lf_neg
           exact lt_of_le_of_ne h_lf_neg (id (Ne.symm h_lf_ne))
         rw [h_x] at h_update_ne'
         rw [h_update_up'] at h_update_ne'
         simp at h_update_ne'
-
-        -- Since the updateState changes the state from down to up,
-        -- the local field must be positive
         by_cases h_pos : 0 < localField net x i
         · exact h_pos
         · push_neg at h_pos
@@ -1274,7 +1005,6 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
               simp [h_zero]
           rw [← h_zero_thresholds i]
           simp_all only [ne_eq, reduceCtorEq]
-
       exact mul_neg_of_neg_of_pos (by exact neg_one_lt_zero) h_lf_pos
   unfold energyDiff
   rw [sub_neg]
@@ -1291,16 +1021,13 @@ lemma energy_fixed_point_iff_no_change (net : HopfieldNetwork n) (x : HopfieldSt
     intro h_energy_eq
     unfold energyDiff at h_energy_eq
     dsimp only
-
     by_cases h_update_eq : updateState net x i = x
     · -- If already equal, we're done
       exact h_update_eq
     · -- If not equal, we get a contradiction with h_energy_eq
       have h_lf_nonzero : localField net x i ≠ 0 := by
-        -- Proof that if update changes the state, local field must be nonzero
         intro h_lf_zero
         have h_update_same : updateState net x i = x := by
-          -- Show that if local field is zero, update doesn't change state
           ext j
           by_cases h_j : j = i
           · -- For position i
@@ -1310,23 +1037,16 @@ lemma energy_fixed_point_iff_no_change (net : HopfieldNetwork n) (x : HopfieldSt
           · -- For positions j ≠ i
             exact Function.update_of_ne h_j _ _
         contradiction  -- Contradicts h_update_eq
-
       have h_energy_decrease : energy net (updateState net x i) < energy net x := by
         have h_energy_diff_neg : energyDiff net x i < 0 := by
           apply energy_strictly_decreasing_if_state_changes_and_localField_nonzero net x i h_zero_thresholds
           · exact h_update_eq  -- State changes
           · exact h_lf_nonzero  -- Local field is nonzero
-        -- Convert from energyDiff to energy difference
         unfold energyDiff at h_energy_diff_neg
         exact sub_neg.mp h_energy_diff_neg
-
-      -- This contradicts our assumption that energy doesn't change
       have h_contradiction : energy net (updateState net x i) ≠ energy net x := by
         exact ne_of_lt h_energy_decrease
-
-      --simp_all only [ne_eq]
-      linarith  -- Contradicts h_energy_eq
-
+      linarith
   · -- (⟸) If state doesn't change, energy doesn't change
     intro h_update_eq
     unfold energyDiff
