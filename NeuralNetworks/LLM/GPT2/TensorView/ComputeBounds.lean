@@ -1,5 +1,13 @@
+/-
+Copyright (c) 2025 Matteo Cipollina. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Matteo Cipollina
+-/
+
 import NeuralNetworks.LLM.GPT2.TensorView.Lemmas
-import Mathlib
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Data.Nat.Cast.Order.Ring
+import Mathlib.Tactic
 
 open LLM.GPT2
 
