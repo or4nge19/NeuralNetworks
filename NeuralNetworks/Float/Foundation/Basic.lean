@@ -4,10 +4,9 @@ import Mathlib.Algebra.Order.Ring.Defs
 import Mathlib.Tactic
 
 /-!
-# Flocq Foundation: Basic Abstractions
+# Float Foundation: Basic Abstractions
 
-This module establishes the core type-theoretic foundations for floating-point arithmetic
-formalization.
+Core type-theoretic foundations for floating-point arithmetic formalization.
 
 ## Mathematical Content
 - Ordered field abstractions suitable for floating-point arithmetic
@@ -24,7 +23,8 @@ TODO
 /-- **Floating-Point Compatible Ordered Field**
 An ordered field suitable for floating-point arithmetic formalization.
 This extends `LinearOrderedField` with additional structure needed for radix-based arithmetic. -/
-class FloatingPointField (α : Type*) extends LinearOrderedField α where
+class FloatingPointField (α : Type*)
+    extends Field α, LinearOrder α, IsStrictOrderedRing α where
   /-- The field supports exact representation of small natural numbers -/
   nat_cast_injective : ∀ n m : ℕ, (n : α) = (m : α) → n = m
   /-- Division by powers of 2 is exact (crucial for binary floating-point) -/
@@ -43,12 +43,12 @@ noncomputable instance : FloatingPointField ℝ where
   abs_mul_eq := abs_mul
 
 /-- **Non-negativity preservation under subtraction**
-Fundamental property for floating-point error analysis. -/
+for floating-point error analysis. -/
 theorem sub_nonneg_of_le {x y : α} (h : x ≤ y) : 0 ≤ y - x := by
   rwa [sub_nonneg]
 
 /-- **Absolute value characterization**
-Essential for floating-point rounding analysis. -/
+for floating-point rounding analysis. -/
 theorem abs_eq_iff_eq_or_eq_neg {x y : α} : |x| = |y| ↔ x = y ∨ x = -y := by
   constructor
   · intro h
@@ -75,13 +75,13 @@ section MultiplicativeProperties
 variable {α : Type*} [FloatingPointField α]
 
 /-- **Multiplication preserves order with non-negative factors**
-This is fundamental for floating-point arithmetic bounds and error analysis. -/
+for floating-point arithmetic bounds and error analysis. -/
 theorem mul_lt_mul_of_nonneg_left {a b c : α} (hab : a < b) (hc : 0 < c) :
     c * a < c * b := by
   exact mul_lt_mul_of_pos_left hab hc
 
 /-- **Multiplication inequality with four terms**
-Essential for floating-point multiplication error bounds. -/
+for floating-point multiplication error bounds. -/
 theorem mul_lt_mul_of_nonneg' {a b c d : α} (hab : a < b) (hcd : c < d)
     (ha : 0 ≤ a) (hc : 0 ≤ c) : a * c < b * d := by
   calc a * c ≤ a * d := mul_le_mul_of_nonneg_left (le_of_lt hcd) ha
@@ -111,7 +111,7 @@ section AbsoluteValueProperties
 variable {α : Type*} [FloatingPointField α]
 
 /-- **Absolute value comparison characterization**
-Essential for floating-point rounding mode analysis. -/
+for floating-point rounding mode analysis. -/
 theorem abs_le_iff_bounds {x y : α} : |x| ≤ y ↔ -y ≤ x ∧ x ≤ y := by
   exact abs_le
 
@@ -119,7 +119,7 @@ theorem abs_lt_iff_bounds {x y : α} : |x| < y ↔ -y < x ∧ x < y := by
   exact abs_lt
 
 /-- **Absolute value reversal under negation**
-Used in floating-point sign handling. -/
+for floating-point sign handling. -/
 theorem abs_ge_iff_ge_or_le_neg {x y : α} : x ≤ |y| ↔ y ≤ -x ∨ x ≤ y := by
   cases le_total 0 y with
   | inl hy =>

@@ -134,8 +134,8 @@ def spinStateEquivZmod2 : SpinState ≃ ZMod 2 where
   right_inv := by
     intro z
     fin_cases z
-    · simp [SpinState.down]
-    · simp [SpinState.up]
+    · simp
+    · simp
 
 end SpinState
 
@@ -162,7 +162,7 @@ We endow `HopfieldState n` with the Hamming distance as a `MetricSpace`.
 -/
 instance : MetricSpace (HopfieldState n) where
   dist := fun x y => (Finset.card {i | x i ≠ y i} : ℝ)
-  dist_self := by simp [Finset.card_eq_zero]
+  dist_self := by simp
   dist_comm := by
     intro x y
     simp
@@ -204,18 +204,17 @@ instance : MetricSpace (HopfieldState n) where
     by_contra h'
     have : i ∈ Finset.filter (fun i => x i ≠ y i) Finset.univ := by
       simp [h']
-    rw [h] at this
-    exact absurd this (Finset.not_mem_empty i)
+    grind only [= Finset.mem_filter]
 
 /--
 Convert a Hopfield state to a real vector of dimension `n`, where
 each coordinate is either `+1` or `-1`.
 -/
-def toRealVector {α : Type*} [LinearOrderedField α] [CharZero α] (x : HopfieldState n) : Fin n → α :=
+def toRealVector {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [CharZero α] (x : HopfieldState n) : Fin n → α :=
   fun i => (if x i = SpinState.up then 1 else -1)
 
 @[simp]
-lemma toRealVector_apply {α : Type*} [LinearOrderedField α] (x : HopfieldState n) (i : Fin n) :
+lemma toRealVector_apply {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] (x : HopfieldState n) (i : Fin n) :
   x.toRealVector i = (x i).toReal := rfl
 
 /--
@@ -224,37 +223,37 @@ lemma toRealVector_apply {α : Type*} [LinearOrderedField α] (x : HopfieldState
    and has zero diagonal.
 2. A threshold vector `thresholds` with one real value per neuron.
 -/
-structure HopfieldNetwork (α : Type*) [LinearOrderedField α] [Star α] (n : ℕ) where
+structure HopfieldNetwork (α : Type*) [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] (n : ℕ) where
   weights : {M : Matrix (Fin n) (Fin n) α // M.IsHermitian ∧ Matrix.diag M = 0}
   thresholds : Fin n → α
 
 /--
 Convenience accessor for the underlying weights matrix.
 -/
-def weightsMatrix {α : Type*} [LinearOrderedField α] [Star α] (net : HopfieldNetwork α n) : Matrix (Fin n) (Fin n) α := net.weights.val
+def weightsMatrix {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] (net : HopfieldNetwork α n) : Matrix (Fin n) (Fin n) α := net.weights.val
 
 @[simp]
-lemma weights_symmetric {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α]
+lemma weights_symmetric {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α]
   (h_star_triv : ∀ a : α, star a = a) (net : HopfieldNetwork α n) :
   Matrix.IsSymm (weightsMatrix net) := by
   rw [Matrix.IsSymm.ext_iff]
   intro i j
   have h := net.weights.prop.1
-  simp only [Matrix.IsHermitian, Matrix.isHermitian_transpose_iff] at h
+  simp only [Matrix.IsHermitian] at h
   have eq1 : (Matrix.transpose (weightsMatrix net)) i j = (weightsMatrix net) j i := by
     rfl
   have eq2 : (weightsMatrix net) j i = (weightsMatrix net) i j :=
     by rw [← h_star_triv ((weightsMatrix net) j i)]; erw [apply h i j]; exact rfl
-  simp only [Star.star, weightsMatrix] at *
+  simp only [weightsMatrix] at *
   rw [← eq1, ← eq2]
   exact eq1
 
 @[simp]
-lemma weights_hermitian {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] (net : HopfieldNetwork α n) :
+lemma weights_hermitian {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] (net : HopfieldNetwork α n) :
   (weightsMatrix net).IsHermitian := net.weights.prop.1
 
 @[simp]
-lemma weights_diag_zero {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] (net : HopfieldNetwork α n) :
+lemma weights_diag_zero {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] (net : HopfieldNetwork α n) :
   Matrix.diag (weightsMatrix net) = 0 := net.weights.prop.2
 
 /--
@@ -262,7 +261,7 @@ Energy function of the Hopfield network for a given state `x`.
 Typical Hopfield energy: `E(x) = -1/2 xᵀWx - bᵀx`.
 -/
 def energy
-{α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+{α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
   (net : HopfieldNetwork α n) (x : HopfieldState n) : α :=
   let xVec := toRealVector x
   let W := weightsMatrix net
@@ -273,7 +272,7 @@ def energy
 Equivalent definition aimed at making the energy function more computationally friendly
 (using the vector dot product ⬝ᵥ)
 -/
-def energy' {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def energy' {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     (net : HopfieldNetwork α n) (x : HopfieldState n) : α :=
   let xVec := toRealVector x;
   let W := weightsMatrix net;
@@ -283,7 +282,7 @@ def energy' {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [
 /--
 Proof that the two energy functions are equivalent
 -/
-lemma energy_eq_energy' {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+lemma energy_eq_energy' {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
  (net : HopfieldNetwork α n) (x : HopfieldState n) :
   energy net x = energy' net x := by
   let xVec := toRealVector (α := α) x
@@ -295,7 +294,7 @@ lemma energy_eq_energy' {α : Type*} [LinearOrderedField α] [Star α] [Involuti
 Local field (net input) for neuron `i` in state `x`,
 `(Wx)_i - threshold[i]`.
 -/
-def localField {α : Type*} [LinearOrderedField α] [Star α] [CharZero α] (net : HopfieldNetwork α n) (x : HopfieldState n) (i : Fin n) : α :=
+def localField {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α] (net : HopfieldNetwork α n) (x : HopfieldState n) (i : Fin n) : α :=
   (weightsMatrix net).mulVec (toRealVector x) i - net.thresholds i
 
 /--
@@ -303,7 +302,7 @@ Asynchronous update rule for neuron `i` in state `x`: flips the spin
 according to the sign of the local field.
 If the local field is zero, no change is made.
 -/
-def updateState {α : Type*} [LinearOrderedField α] [Star α] [CharZero α] (net : HopfieldNetwork α n) (x : HopfieldState n) (i : Fin n) : HopfieldState n :=
+def updateState {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α] (net : HopfieldNetwork α n) (x : HopfieldState n) (i : Fin n) : HopfieldState n :=
   Function.update x i $
     let lf := localField net x i
     if 0 < lf then SpinState.up
@@ -314,14 +313,14 @@ def updateState {α : Type*} [LinearOrderedField α] [Star α] [CharZero α] (ne
 `UpdateSeq net x` is an inductive type representing a sequence of
 asynchronous updates on the Hopfield network `net` starting from state `x`.
 -/
-inductive UpdateSeq {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+inductive UpdateSeq {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} (net : HopfieldNetwork α n) : HopfieldState n → Type
   | nil : (x : HopfieldState n) → UpdateSeq net x
   | cons : (x : HopfieldState n) → (i : Fin n) → UpdateSeq net (updateState net x i) → UpdateSeq net x
 /--
 Defines a function to generate a specific UpdateSeq
 -/
-def updateSeqOfList {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def updateSeqOfList {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     (net : HopfieldNetwork α n) (x : HopfieldState n) (l : List (Fin n)) : HopfieldState.UpdateSeq net x :=
      match l with
      | [] => HopfieldState.UpdateSeq.nil x
@@ -331,14 +330,14 @@ namespace UpdateSeq
 /--
 Get the length of an update sequence.
 -/
-def length {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def length {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} {net : HopfieldNetwork α n} {x : HopfieldState n} : UpdateSeq net x → ℕ
   | nil _ => 0
   | cons _ _ s => s.length + 1
 /--
 Extract the final state from an update sequence.
 -/
-def target {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def target {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} {net : HopfieldNetwork α n} {x : HopfieldState n}
   : UpdateSeq net x → HopfieldState n
   | nil x => x
@@ -346,13 +345,13 @@ def target {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [C
 /--
 A state `x` is a fixed point under `net` if no single-neuron update changes the state.
 -/
-def isFixedPoint {α : Type*} [LinearOrderedField α] [Star α] [CharZero α]
+def isFixedPoint {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α]
     {n : ℕ} (net : HopfieldNetwork α n) (x : HopfieldState n) : Prop :=
   ∀ i, updateState net x i = x
 /--
 Decidability of fixed points.
 -/
-instance {α : Type*} [LinearOrderedField α] [Star α] [CharZero α]
+instance {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α]
     {n : ℕ} {net : HopfieldNetwork α n} {x : HopfieldState n} : Decidable (HopfieldState.UpdateSeq.isFixedPoint net x) :=
   by
   unfold HopfieldState.UpdateSeq.isFixedPoint
@@ -364,7 +363,7 @@ instance {α : Type*} [LinearOrderedField α] [Star α] [CharZero α]
 A state `x` converges to a fixed point `p` if there is an update
 sequence from `x` that terminates at `p`, and `p` is a fixed point.
 -/
-def convergesTo {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def convergesTo {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} (net : HopfieldNetwork α n) (x p : HopfieldState n) : Prop :=
   ∃ (seq : UpdateSeq net x), seq.target = p ∧ isFixedPoint net p
 
@@ -373,7 +372,7 @@ def convergesTo {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar �
 Bounded convergence: There exists an update sequence from `x` that terminates at `p`,
 `p` is a fixed point, and the sequence length is at most `maxSteps`.
 -/
-def convergesToBounded {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+def convergesToBounded {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} (net : HopfieldNetwork α n) (x p : HopfieldState n) (maxSteps : ℕ) : Prop :=
   ∃ (seq : HopfieldState.UpdateSeq net x), seq.target = p ∧ HopfieldState.UpdateSeq.isFixedPoint net p ∧
       -- Add a condition on the length of the sequence
@@ -382,7 +381,7 @@ def convergesToBounded {α : Type*} [LinearOrderedField α] [Star α] [Involutiv
 /-
 Decidability of bounded convergence
 -/
-noncomputable instance {α : Type*} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+noncomputable instance {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} {net : HopfieldNetwork α n} {x p : HopfieldState n} {maxSteps : ℕ} :
     Decidable (convergesToBounded net x p maxSteps) := by
   classical
@@ -434,7 +433,7 @@ lemma overlap_and_distance {n : ℕ} (x y : HopfieldState n) :
     simp only [ne_eq]
     congr
     ext i
-    simp only [List.mem_filter, List.mem_finRange, Fin.val_eq_val, true_and]
+    simp only
     simp only [decide_not]
   rw [this]
   simp [PseudoMetricSpace.toDist]
@@ -449,7 +448,7 @@ def NeuronSelector (n : ℕ) := HopfieldState n → Option (Fin n)
 A random update rule that uses a selector to choose which neuron to update.
 Returns None if no update is needed or possible.
 -/
-def randomUpdate {α : Type*} [LinearOrderedField α] [Star α] [CharZero α]
+def randomUpdate {α : Type*} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α]
     {n : ℕ} (net : HopfieldNetwork α n) (selector : NeuronSelector n)
     (x : HopfieldState n) : Option (HopfieldState n) := do
   let i ← selector x
@@ -462,7 +461,7 @@ stored patterns with a threshold criterion guaranteeing pattern completion.
 -/
 universe u
 
-structure ContentAddressableMemory {α : Type u} [LinearOrderedField α] [Star α] [CharZero α]
+structure ContentAddressableMemory {α : Type u} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [CharZero α]
     (n : ℕ) : Type (u+1) where
   /-- The underlying Hopfield network used for pattern storage and recall. -/
   network : HopfieldNetwork α n
@@ -479,7 +478,7 @@ structure ContentAddressableMemory {α : Type u} [LinearOrderedField α] [Star �
 /--
 Convenience coercion from `ContentAddressableMemory` to its underlying `HopfieldNetwork`.
 -/
-instance contentAddressableMemoryToHopfieldNetwork {α : Type u} [LinearOrderedField α] [Star α] [InvolutiveStar α] [CharZero α]
+instance contentAddressableMemoryToHopfieldNetwork {α : Type u} [Field α] [LinearOrder α] [IsStrictOrderedRing α] [Star α] [InvolutiveStar α] [CharZero α]
     {n : ℕ} :
     Coe (ContentAddressableMemory (α := α) n) (HopfieldNetwork α n) where
   coe c := c.network

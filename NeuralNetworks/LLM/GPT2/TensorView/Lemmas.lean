@@ -1,7 +1,6 @@
 import NeuralNetworks.LLM.GPT2.TensorView.Defs
 
-open LLM.GPT2 -- For Core types like TensorError, bytesPerFloat
-open Batteries
+open LLM.GPT2
 
 namespace LLM.GPT2
 
@@ -19,8 +18,8 @@ lemma extract_eq_self_of_rank_eq_size (shape : Array Nat) :
   apply Array.ext_getElem?
   intro i
   by_cases h_i : i < shape.size
-  · simp [Array.getElem?_extract, h_i]
-  · simp [Array.getElem?_extract, Array.getElem?_eq_none, h_i]
+  · simp [h_i]
+  · simp [h_i]
 
 /-- When extracting beyond the array size (rank > shape.size), the extract equals the original array -/
 lemma extract_eq_self_of_rank_gt_size (shape : Array Nat) (rank : Nat) (h : shape.size ≤ rank) :
@@ -36,24 +35,22 @@ lemma extract_eq_self_of_rank_gt_size (shape : Array Nat) (rank : Nat) (h : shap
       exact h
     have h_i_lt_size : i < shape.size := by rw [← h_sizes_eq]; exact h_i_lt
     have h_i_lt_rank : i < rank := Nat.lt_of_lt_of_le h_i_lt_size h
-    simp [h_i_lt_size, h_i_lt_rank]
+    simp [h_i_lt_size]
 
 /-- For elements within a prefix extract, the extract's element equals the original array's element -/
 lemma getElem!_extract_prefix (shape : Array Nat) (rank : Nat) (i : Nat)
     (h_i_lt_rank : i < rank) (h_i_lt_size : i < shape.size) :
   (shape.extract 0 rank)[i]! = shape[i]! := by
   have h_extract_get : (shape.extract 0 rank).size > i := by
-    simp only [Array.size_extract, tsub_zero, min_eq_left]
+    simp only [Array.size_extract, tsub_zero]
     exact lt_min h_i_lt_rank h_i_lt_size
   have h_extract_elem : (shape.extract 0 rank)[i]'h_extract_get = shape[i]'h_i_lt_size := by
-    simp only [Array.getElem_extract, h_i_lt_rank, if_true]
+    simp only [Array.getElem_extract]
     rw [@Array.getElem_eq_iff]
     simp only [zero_add, Array.getElem?_eq_some_getElem_iff]
   rw [@Array.getElem!_eq_getD]
   rw [@Array.getD_eq_getD_getElem?]
   simp_all
-  simp_all only [Array.size_extract, tsub_zero, gt_iff_lt, lt_inf_iff, and_self]
-  exact Eq.symm (Array.getElem_eq_get! h_i_lt_size)
 
 /--
 Helper Lemma: The list formed by mapping `shape[i]!` over `List.range rank` is equal to
@@ -196,7 +193,7 @@ lemma product_list_take_eq_product_map_range (shape : Array Nat) (rank : Nat) (h
       have h_list_eq_array : shape.toList[i] = shape[i]! := by
         have h_i_lt_shape_size : i < shape.size := by
           apply Nat.lt_of_lt_of_le h_i_lt_rank h_rank_le_size
-        simp only [List.get_eq_getElem, Array.getElem_toList]
+        simp only [Array.getElem_toList]
         exact Eq.symm (Array.getElem_eq_get! h_i_lt_shape_size)
       rw [← h_list_eq_array]
       rw [← Array.getElem_eq_get! h_i_lt_shape_size]
@@ -277,9 +274,9 @@ lemma List.extract_of_start_ge_end {α : Type} {l : List α} {start stop : Nat} 
   unfold List.extract
   cases Nat.le_total start (List.length l) with
   | inl h_le =>
-    simp only [List.extract_eq_drop_take, List.take_eq_nil_iff, List.drop_eq_nil_iff]
+    simp only [List.take_eq_nil_iff, List.drop_eq_nil_iff]
     rw [Nat.sub_eq_zero_of_le h]
-    simp only [List.take_zero]
+    simp only
     simp only [true_or]
   | inr h_gt =>
     simp [h_gt]
@@ -303,7 +300,7 @@ lemma Array.extract_prefix_toList_eq_take_toList {α : Type} (arr : Array α) (i
 lemma Array.extract_suffix_toList_eq_drop_toList {α : Type} (arr : Array α) (i : Nat) (_ : i ≤ arr.size) :
   (arr.extract i arr.size).toList = arr.toList.drop i := by
   rw [Array.extract_toList_eq_list_extract, Nat.min_self]
-  simp [List.extract_eq_drop_take, List.take_length]
+  simp [List.extract_eq_drop_take]
 
 /-- Lemma: The product of the first segment and remaining segment equals the total product -/
 lemma shape_extract_product_split (shape : Array Nat) (i : Nat) (h_i_le_size : i ≤ shape.size) :
@@ -322,12 +319,12 @@ lemma Array.size_extract_of_start_lt_stop_le_size {α : Type} (arr : Array α) (
   (arr.extract start stop).size = stop - start := by
   simp only [Array.size_extract]
   have h_not_stop_le_start : ¬(stop ≤ start) := Nat.not_le_of_gt h_start_lt_stop
-  simp [h_not_stop_le_start, min_eq_left h_stop_le_size]
+  simp [min_eq_left h_stop_le_size]
 
 /-- When the start index equals or exceeds the stop index, the extract has size 0. -/
 lemma Array.size_extract_of_stop_le_start {α : Type} (arr : Array α) (start stop : Nat)
     (h : stop ≤ start) : (arr.extract start stop).size = 0 := by
-  simp only [Array.size_extract, tsub_zero]
+  simp only [Array.size_extract]
   have h_min_le : min stop arr.size ≤ start := by
     apply Nat.le_trans
     · apply min_le_left
@@ -343,9 +340,9 @@ lemma Array.extract_toList_length_eq_cons_extract_toList_length {α : Type} [Inh
   have h_idx_plus_1_le_stop : idx + 1 ≤ stop := Nat.succ_le_of_lt h_idx_lt_stop
   by_cases h_idx_plus_1_eq_stop : idx + 1 = stop
   · rw [h_idx_plus_1_eq_stop]
-    simp only [Array.size_extract_of_stop_le_start arr stop stop (Nat.le_refl stop), add_zero]
+    simp only [Array.size_extract_of_stop_le_start arr stop stop (Nat.le_refl stop)]
     rw [← h_idx_plus_1_eq_stop]
-    simp [Nat.add_sub_cancel]
+    simp
   · have h_idx_plus_1_lt_stop' : idx + 1 < stop := Nat.lt_of_le_of_ne h_idx_plus_1_le_stop h_idx_plus_1_eq_stop
     rw [Array.size_extract_of_start_lt_stop_le_size arr (idx + 1) stop h_idx_plus_1_lt_stop' h_stop_le_arr_size]
     rw [Nat.sub_succ' stop idx]
@@ -536,7 +533,7 @@ lemma product_extract_prefix_step (shape : Array Nat) (k_idx : Nat)
     rw [Array.length_toList]; exact h_k_idx_lt_shape_size
   rw [List.prod_take_succ _ _ h_k_idx_lt_list_len]
   have h_list_get_eq_array_get_bang : shape.toList[k_idx] = shape[k_idx]! := by
-    simp only [List.get_eq_getElem, Array.getElem_toList]
+    simp only [Array.getElem_toList]
     exact Eq.symm (Array.getElem_eq_get! h_k_idx_lt_shape_size)
   rw [h_list_get_eq_array_get_bang]
   exact Nat.mul_comm _ _
@@ -672,7 +669,7 @@ lemma extract_computeHelper_i_rev_zero_components
   · exfalso
     exact Nat.lt_le_asymm h_rank_gt_zero h_if_cond
   · by_cases h_idx_ge_dim : indices[rank - 1]! >= shape[rank - 1]!
-    · simp [h_idx_ge_dim] at h_helper
+    · simp at h_helper
       omega
     · apply And.intro
       · exact Nat.lt_of_not_ge h_idx_ge_dim
@@ -739,7 +736,8 @@ lemma extract_prefix_product_positive (shape : Array Nat) (rank : Nat) (i : Nat)
     have h_get_take_p_eq_x : (List.take i shape.toList).get p = x := hp
     let j := p.val
     have h_j_lt_i : j < i := by
-        have h_take_len : (List.take i shape.toList).length = min i shape.toList.length := List.length_take i shape.toList
+        have h_take_len : (List.take i shape.toList).length = min i shape.toList.length :=
+          List.length_take
         have h_p_lt_min : p.val < min i shape.toList.length := by
           rw [← h_take_len]
           exact h_p_lt_drop_len
@@ -999,7 +997,7 @@ lemma computeHelper_bounds_base_rank_zero'
   have h_zero_eq_size : 0 = shape.size := by
     rw [←h_rank_eq_size]
     subst h_rank_eq_size h_stride
-    simp_all only [List.length_eq_zero_iff, Array.toList_eq_nil_iff, Fin.getElem_fin, List.getElem_toArray, gt_iff_lt,
+    simp_all only [Fin.getElem_fin, gt_iff_lt,
       Array.extract_eq_nil_of_start_eq_end, List.size_toArray, List.length_nil, List.foldl_toArray', List.foldl_nil,
       mul_one, Nat.lt_one_iff]
   have h_empty_fold : shape.foldl (· * ·) 1 = 1 := by
@@ -1100,7 +1098,7 @@ lemma computeHelper_bounds_base_rank_one_fixed'
       rw [h_rank_one]; apply extract_empty_product
     have h_stride_is_one : stride = 1 := by
       rw [h_stride]; apply extract_empty_product
-    simp [h_extract_empty, h_stride_is_one]
+    simp [h_stride_is_one]
     have singleton : shape.foldl (· * ·) 1 = dim_size := by
       have h_extract_all : shape.extract 0 rank = shape := by
         rw [h_rank_eq_size]
@@ -1120,19 +1118,19 @@ lemma computeHelper_bounds_base_rank_one_fixed'
     have h_extract_is_empty : (shape.extract 0 (rank - 1)).foldl (· * ·) 1 = 1 := by
       rw [h_rank_one]
       simp only [Nat.sub_self, Array.extract_eq_nil_of_start_eq_end, List.size_toArray,
-        List.length_nil, List.foldl_toArray', List.foldl_nil, k_idx, dim_size, index_val]
+        List.length_nil, List.foldl_toArray', List.foldl_nil]
     rw [h_extract_is_empty]
     rw [Nat.mul_one]
     rw [h_dim_size_is_shape_0]
     exact h_stride_is_one ▸ (Nat.one_mul shape[0]!)
   rw [h_rank_eq_size] at h_bound
   simp only [Array.extract_eq_pop, Array.size_pop, k_idx, dim_size, index_val] at h_bound
-  simp [h_dim_size_is_shape_0] at h_bound
+  simp at h_bound
   rw [h_shape_product]
   subst h_indices_size h_stride h_flatIndexRel_is_zero h_result_eq
   simp_all only [Fin.getElem_fin, gt_iff_lt, le_refl, Nat.sub_eq_zero_of_le, Nat.lt_one_iff, pos_of_gt,
     Fin.getElem!_fin, Array.extract_eq_nil_of_start_eq_end, List.size_toArray, List.length_nil, List.foldl_toArray',
-    List.foldl_nil, one_mul, Nat.sub_self, mul_one, Array.size_extract, min_self, tsub_zero, zero_add, true_and,
+    List.foldl_nil, one_mul, mul_one, Array.size_extract, min_self, tsub_zero, zero_add, true_and,
     index_val, k_idx, dim_size]
 
 lemma computeHelper_bounds_base_rank_zero
@@ -1209,7 +1207,7 @@ lemma computeHelper_bounds_base_rank_one_fixed
     let i := rank - 1 - 0
     let index := indices[i]!
     let dimSize := shape[i]!
-    simp only [h_ge_test, not_true_eq_false, if_false] at h_helper
+    simp only [h_ge_test, if_false] at h_helper
     by_cases h_index_ge_local : index ≥ dimSize
 
     case pos =>
@@ -1222,12 +1220,12 @@ lemma computeHelper_bounds_base_rank_one_fixed
             let newStride := stride * dimSize_let;
             computeHelper shape rank indices (0 + 1) newFlatIndex newStride) =
             Except.error (TensorError.indexOutOfBounds indices shape) := by
-        simp only [i, index, dimSize]
+        simp only
         rw [if_pos h_index_ge_local]
       rw [h_error_result] at h_helper
       cases h_helper
     case neg =>
-      simp only [i, index, dimSize, h_index_ge_local, not_true_eq_false, if_false] at h_helper
+      simp only [i, index, dimSize, h_index_ge_local, if_false] at h_helper
       have h_stride_one : stride = 1 := by
         have h_extract_empty : (shape.extract rank rank).foldl (· * ·) 1 = 1 := by
           apply extract_empty_product
@@ -1245,7 +1243,7 @@ lemma computeHelper_bounds_base_rank_one_fixed
           simp only [ge_iff_le, le_refl, if_true]
         have h_helper_simp := h_helper
         rw [h_rank_one] at h_helper_simp
-        simp only [i, index, dimSize, h_rank_one, Nat.sub_self, tsub_zero, zero_add] at h_helper_simp
+        simp only [Nat.sub_self, tsub_zero, zero_add] at h_helper_simp
         unfold computeHelper at h_helper_simp
         rw [if_pos (by rw [← h_rank_one]; )] at h_helper_simp
         rw [Except.ok.injEq] at h_helper_simp
@@ -1286,7 +1284,7 @@ lemma computeHelper_bounds_base_rank_one_fixed
         exact id (Eq.symm h_extract_elem_get_bang)
       have h_index_lt_dim : indices[0]! < shape[0]! := by
         have h_i_eq_0 : i = 0 := by
-          simp [i, h_rank_one, Nat.sub_self, Nat.sub_zero]
+          simp [i, h_rank_one, Nat.sub_self]
         have h_index_is_indices_0 : index = indices[0]! := by
           simp [index, h_i_eq_0]
         have h_dimSize_is_shape_0 : dimSize = shape[0]! := by

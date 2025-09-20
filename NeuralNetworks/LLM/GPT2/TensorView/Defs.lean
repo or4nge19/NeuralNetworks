@@ -84,7 +84,7 @@ lemma exists_index_of_mem_with_get_bang
 lemma TensorView.elementCount_pos {s : Type} (tv : TensorView s) : tv.elementCount > 0 := by
   rw [TensorView.elementCount]
   have h_array_to_list : tv.shape.foldl (· * ·) 1 = List.foldl (· * ·) 1 tv.shape.toList := by
-    simp only [Array.foldl_toList, Array.toListImpl_eq]
+    simp only [Array.foldl_toList]
   rw [h_array_to_list]
   have h : List.foldl (· * ·) 1 tv.shape.toList = tv.shape.toList.prod := by
     exact (List.prod_eq_foldl (l := tv.shape.toList)).symm

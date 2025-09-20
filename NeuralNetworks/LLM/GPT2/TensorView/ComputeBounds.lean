@@ -1,7 +1,7 @@
 import NeuralNetworks.LLM.GPT2.TensorView.Lemmas
+import Mathlib
 
 open LLM.GPT2
-open Batteries
 
 namespace LLM.GPT2
 
@@ -45,12 +45,12 @@ lemma computeHelper_eq_ok_iff_rel
       by_cases h_idx_bang_ge_dim_bang : indices[k_val]! ≥ shape[k_val]!
       · -- Case 1: indices[k_val]! ≥ shape[k_val]! (Error case in computeHelper)
         have h_error_branch_is_taken : Except.error (TensorError.indexOutOfBounds indices shape) = Except.ok res := by
-          simp (config := {zetaDelta := true}) [computeHelper, h_i_lt_rank, k_val, h_idx_bang_ge_dim_bang] at h_compute_ok_main
+          simp (config := {zetaDelta := true}) [computeHelper, h_idx_bang_ge_dim_bang] at h_compute_ok_main
           subst h_shape_size_eq_rank
           simp_all [k_val, current_idx_val_safe, current_dim_val_safe]
           split at h_compute_ok_main
           next h =>
-            simp_all only [Nat.sub_eq_zero_of_le, self_eq_add_left, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false]
+            simp_all only [Nat.sub_eq_zero_of_le, right_eq_add, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false]
           next h => simp_all only [not_le, reduceCtorEq]
         cases h_error_branch_is_taken
       · -- Case 2: indices[k_val]! < shape[k_val]! (Recursive call case in computeHelper)
@@ -59,9 +59,7 @@ lemma computeHelper_eq_ok_iff_rel
         have h_recursive_call_eq_ok : computeHelper shape rank indices (i + 1) next_fir_val next_sa_val = Except.ok res := by
           unfold computeHelper at h_compute_ok_main
           simp [
-            if_neg (Nat.not_le_of_lt h_i_lt_rank),
-            if_neg h_idx_bang_ge_dim_bang
-          ] at h_compute_ok_main
+            if_neg (Nat.not_le_of_lt h_i_lt_rank)] at h_compute_ok_main
           subst h_shape_size_eq_rank
           simp_all [k_val, current_idx_val_safe, current_dim_val_safe, next_fir_val, next_sa_val]
           split at h_compute_ok_main
@@ -79,7 +77,7 @@ lemma computeHelper_eq_ok_iff_rel
         have h_next_fir_eq_safe : next_fir_val = fir + current_idx_val_safe * sa := by
           simp only [h_get_bang_idx_eq_safe, next_fir_val]
         have h_next_sa_eq_safe : next_sa_val = sa * current_dim_val_safe := by
-          simp only [h_get_bang_shape_eq_safe, next_sa_val, next_fir_val]
+          simp only [h_get_bang_shape_eq_safe, next_sa_val]
         rw [h_next_fir_eq_safe, h_next_sa_eq_safe] at h_rec_call_rel
         apply ComputeHelperRel.rs i fir sa (fir + current_idx_val_safe * sa) (sa * current_dim_val_safe) res
         · exact h_i_lt_rank
@@ -203,8 +201,8 @@ theorem computeHelper_bounds
                 (by {rw [h_flat_is_zero_proof, h_stride_is_one_case0,
                   Nat.one_mul]; apply extract_prefix_product_positive shape rank rank h_rank_eq_size (Nat.le_refl _) h_dims_pos_bang})
                 h_dims_pos_bang index_val_local dimSize_local h_idx_lt_dim rfl h_flat_is_zero_proof;
-              · simp [new_flatIndex_rec, h_flat_is_zero_proof, h_stride_is_one_case0, Nat.zero_add, Nat.mul_one];
-              · simp [new_stride_rec, h_stride_is_one_case0, Nat.one_mul];
+              · simp [new_flatIndex_rec, h_flat_is_zero_proof, h_stride_is_one_case0]
+              · simp [new_stride_rec, h_stride_is_one_case0]
             })
           · dsimp only [new_flatIndex_rec, new_stride_rec, index_val_local, dimSize_local, i_for_helper]
             rw [← Nat.one_mul shape[rank - 1]!]; simp only [Nat.mul_one] at h_helper_main_zero_i_rev; exact h_helper_main_zero_i_rev
