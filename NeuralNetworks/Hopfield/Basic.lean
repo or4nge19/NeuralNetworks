@@ -131,8 +131,8 @@ def spinStateEquivZmod2 : SpinState ≃ ZMod 2 where
   right_inv := by
     intro z
     fin_cases z
-    · simp [SpinState.down]
-    · simp [SpinState.up]
+    · simp
+    · simp
 
 end SpinState
 
@@ -159,7 +159,7 @@ We endow `HopfieldState n` with the Hamming distance as a `MetricSpace`.
 -/
 instance : MetricSpace (HopfieldState n) where
   dist := fun x y => (Finset.card {i | x i ≠ y i} : ℝ)
-  dist_self := by simp [Finset.card_eq_zero]
+  dist_self := by simp
   dist_comm := by
     intro x y
     simp
@@ -201,8 +201,8 @@ instance : MetricSpace (HopfieldState n) where
     by_contra h'
     have : i ∈ Finset.filter (fun i => x i ≠ y i) Finset.univ := by
       simp [h']
-    rw [h] at this
-    exact absurd this (Finset.not_mem_empty i)
+    rw [Finset.mem_filter_univ] at this
+    aesop
 
 /--
 Convert a Hopfield state to a real vector of dimension `n`, where
@@ -415,7 +415,7 @@ lemma overlap_and_distance {n : ℕ} (x y : HopfieldState n) :
     simp only [ne_eq]
     congr
     ext i
-    simp only [List.mem_filter, List.mem_finRange, Fin.val_eq_val, true_and]
+    simp only
     simp only [decide_not]
   rw [this]
   simp [PseudoMetricSpace.toDist]

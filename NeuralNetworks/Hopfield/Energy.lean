@@ -9,7 +9,9 @@ import Mathlib.Algebra.Lie.OfAssociative
 import Mathlib.Data.Real.Sign
 import Mathlib.Data.Real.StarOrdered
 import NeuralNetworks.Hopfield.Basic
+import Mathlib
 
+open Mathlib
 section EnergyDecrease
 
 
@@ -318,7 +320,7 @@ lemma energy_diff_single_flip (net : HopfieldNetwork n) (x : HopfieldState n) (i
   have h_diff_i : ∀ j, j ≠ i → x'Vec j = xVec j := by
     intro j hj
     have h_states_eq_at_j : x' j = x j := h_diff j hj
-    simp [x'Vec, xVec, toRealVector]
+    simp [x'Vec, xVec]
     rw [h_states_eq_at_j]
   have h_bilin_diff : Matrix.toBilin' W x'Vec x'Vec - Matrix.toBilin' W xVec xVec =
     2 * (x'Vec i - xVec i) * (W.mulVec xVec i) := by
@@ -440,7 +442,7 @@ lemma energy_decreases_on_update_with_inconsistent_signs
       unfold updateState
       simp
       have : lf > 0 := h_pos
-      simp [this, h_x_is_down]
+      simp [h_x_is_down]
       exact h_pos
     have h_diff_simplified : energy net x' - energy net x < 0 := by
       rw [h_energy_diff]
@@ -528,7 +530,7 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
       have h_energies_equal : energy net x' = energy net x := by
         rw [← sub_eq_zero]
         rw [h_energy_diff]
-        simp [mul_zero]
+        simp only [mul_eq_zero]
         rw [← h_lf_zero]
         exact AffineMap.lineMap_eq_lineMap_iff.mp rfl
       have h_x'_eq : x' = updateState net x i := rfl
@@ -556,8 +558,7 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
         ext j
         if h : j = i then
           subst h
-          rw [← @Function.graph_id]
-          simp [updateState, Real.sign_of_pos, Real.sign_of_neg, h_same_sign, h_lf_zero]
+          --simp [updateState, h_lf_zero]
           change updateState net ?_ ?_ ?_ = ?_
           unfold updateState
           simp
@@ -573,7 +574,7 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
                 exact eq_of_toReal_eq h_same_sign
               | up => rfl
             rw [this]
-            simp [h_pos]
+            simp only [ite_eq_left_iff, not_lt, ite_eq_right_iff, reduceCtorEq, imp_false]
             exact fun a ↦ le_of_lt h_pos
           | inr h_neg =>
             have : x j = SpinState.down := by
@@ -585,7 +586,7 @@ lemma energy_decreases_on_update (net : HopfieldNetwork n) (x : HopfieldState n)
                 rw [h_up, h_lf_sign] at h_same_sign
                 exact eq_of_toReal_eq h_same_sign
             rw [this]
-            simp [h_neg]
+            simp only [ite_self, ite_eq_right_iff, reduceCtorEq, imp_false, not_lt, ge_iff_le]
             exact le_of_lt h_neg
         else
           rw [h_diff_j j h]
@@ -726,12 +727,12 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
           · -- This case is impossible: if lf < 0, updateState would flip to down
             have h_would_update : updateState net x i i = SpinState.down := by
               unfold updateState
-              simp [h_lf_neg]
+              simp only [Function.update_self]
               simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
                 ite_eq_right_iff, imp_false, not_lt, lf]
             have h_update_down : updateState net x i i = SpinState.down := by
               unfold updateState
-              simp [h_lf_neg]
+              simp only [Function.update_self]
               rw [← h_update_eq_x]
               rw [← h_zero_thresholds i]
               simp_all only [ne_eq, down_up_diff, neg_neg, reduceCtorEq, not_false_eq_true, ↓reduceIte,
@@ -776,7 +777,7 @@ theorem energy_minimality_at_fixed_points (net : HopfieldNetwork n)
           · -- This case is impossible: if lf > 0, updateState would flip to up
             have h_would_update : updateState net x i i = SpinState.up := by
               unfold updateState
-              simp [h_lf_pos]
+              simp only [Function.update_self, ite_eq_left_iff, not_lt]
               have h_contra : localField net x i ≤ 0 → False := by
                 intro h
                 exact not_le_of_gt h_lf_pos h
@@ -868,7 +869,7 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
       have h_xi_real : (x i).toReal = 1 := by rw [h_x]; rfl
       have h_update_down : updateState net x i = Function.update x i SpinState.down := by
         unfold updateState
-        simp [h_lf_ne]
+        simp only
         by_cases h_pos : 0 < localField net x i
         · exfalso
           have h_update_up : updateState net x i = x := by
@@ -966,7 +967,7 @@ lemma energy_strictly_decreasing_if_state_changes_and_localField_nonzero
             have h_contra := lt_of_le_of_ne h_le h_lf_ne
             have h_not_lf_neg : ¬(localField net x i < 0) := by
               have h_pos : 0 < localField net x i := by
-                push_neg at h_lf_neg
+                --push_neg at h_lf_neg
                 exfalso
                 have h_no_update : updateState net x i = x := by
                   ext j

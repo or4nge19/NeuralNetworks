@@ -2,7 +2,6 @@ import NeuralNetworks.LLM.GPT2.Core
 
 namespace LLM.GPT2.ByteArray
 
-open Batteries
 open LLM.GPT2
 
 --  Section 2: Optimized ByteArray Float I/O

@@ -1,4 +1,5 @@
 /-
+/-
 Copyright (c) 2025 Matteo Cipollina. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Matteo Cipollina
@@ -188,3 +189,4 @@ noncomputable def metropolisHastingsSteps (weights : Fin n → Fin n → ℝ) (T
                        (fun s => metropolisHastingsStep weights T s)
 
 end HopfieldState
+-/

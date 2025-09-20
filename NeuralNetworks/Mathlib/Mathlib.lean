@@ -1,5 +1,6 @@
 import NeuralNetworks.Hopfield.Basic
 import Mathlib.Analysis.Normed.Field.Lemmas
+import Mathlib
 
 open Finset BigOperators
 
@@ -71,7 +72,6 @@ lemma Finset.insert_eq' {α : Type*} [DecidableEq α] (a : α) (s : Finset α) :
     aesop
 
 /- Insert an element into a finite set.
-    Essential for Hopfield network set operations.
     Returns a new set containing the element and all original elements. -/
 --def Finset.insert {α : Type*} [DecidableEq α] (a : α) (s : Finset α) : Finset α :=
 --  if a ∈ s then s else {a} ∪ s
@@ -83,8 +83,7 @@ lemma Finset.insert_eq' {α : Type*} [DecidableEq α] (a : α) (s : Finset α) :
 @[simp]
 theorem Finset.mem_insert' {α : Type*} [DecidableEq α] {a x : α} {s : Finset α} :
   x ∈ insert a s ↔ x = a ∨ x ∈ s := by
-  simp
-  aesop
+  (expose_names; rw [mem_insert])
 
 /-- Insert followed by difference with singleton:
     (insert a s) \ {a} = s \ {a}
@@ -123,8 +122,7 @@ lemma Finset.sum_add_sum_diff {α : Type*} [DecidableEq α] [Fintype α] {β : T
     simp only [mem_union, mem_inter, mem_sdiff]
     tauto
   · rw [Finset.disjoint_iff_ne]
-    intro y hy z hz
-    intro eq
+    intro y hy z hz eq
     rw [← eq] at hz
     simp at hy
     aesop
@@ -218,7 +216,7 @@ lemma Finset.card_le_of_subset {α : Type*} [DecidableEq α] {s t : Finset α}
     simp only [card_empty]
     exact Nat.zero_le _
   | @insert a s ha ih =>
-    rw [Finset.card_insert_of_not_mem ha]
+    rw [Finset.card_insert_of_notMem ha]
     by_cases h' : a ∈ t
     · have : s ⊆ t := fun x hx => h (Finset.mem_insert_of_mem hx)
       have h_le := ih this
@@ -244,11 +242,11 @@ lemma Finset.card_image_of_inj {α β : Type*} [DecidableEq α] [DecidableEq β]
   induction s using Finset.induction with
   | empty => simp only [image_empty, card_empty]
   | @insert a s h_not_mem h_ih =>
-    rw [image_insert, card_insert_of_not_mem]
+    rw [image_insert, Finset.card_insert_of_notMem]
     · have h_inj_s : ∀ x₁ ∈ s, ∀ x₂ ∈ s, f x₁ = f x₂ → x₁ = x₂ := fun x₁ h₁ x₂ h₂ =>
         h_inj x₁ (Finset.mem_insert_of_mem h₁) x₂ (Finset.mem_insert_of_mem h₂)
       rw [h_ih h_inj_s]
-      rw [card_insert_of_not_mem h_not_mem]
+      rw [Finset.card_insert_of_notMem h_not_mem]
     · intro h
       simp only [mem_image] at h
       obtain ⟨x, hx, hf⟩ := h
@@ -340,8 +338,7 @@ lemma Finset.card_eq_zero_iff {α : Type*} {s : Finset α} :
     rfl
 
 /-- Sets have equal cardinality if there is a bijective correspondence:
-    If f maps s to t bijectively, then |s| = |t|
-    Essential for Hopfield network state space equivalence. -/
+    If f maps s to t bijectively, then |s| = |t| -/
 @[simp]
 lemma Finset.card_congr {α β : Type*} [Fintype α] [Fintype β] [DecidableEq α] [DecidableEq β] [Nonempty α]
   {s : Finset α} {t : Finset β} {f : α → β}
@@ -392,39 +389,14 @@ lemma Finset.card_eq_of_veq {α : Type*} [DecidableEq α]
     exact (h x).mpr hx
 
 
-open Matrix Matrix.toBilin BilinForm Matrix.toQuadraticMap'
+open Matrix LinearMap BilinForm --Matrix.toQuadraticMap'
 open SpinState HopfieldState UpdateSeq
 
 variable {n : ℕ}
 
+/-
 lemma LinearMap.toMatrix₂'_symm_apply {n : ℕ}
     (W : Matrix (Fin n) (Fin n) ℝ) (v w : Fin n → ℝ) :
     dotProduct (W.mulVec v) w = (((LinearMap.toMatrix₂' ℝ).symm W) v) w := by
-  simp only [dotProduct, mulVec, LinearMap.toMatrix₂']
-
-  -- Our goal is to show
-  -- ∑ i, (∑ j, W i j * v j) * w i = (((LinearMap.toMatrix₂' ℝ).symm W) v) w
-
-  -- First, expand the left-hand side
-  have expand_lhs : ∑ i, (∑ j, W i j * v j) * w i = ∑ i, ∑ j, W i j * v j * w i := by
-    apply Finset.sum_congr rfl
-    intro i _
-    exact Finset.sum_mul Finset.univ (fun j ↦ W i j * v j) (w i)
-
-  -- Rewrite the LHS using our expansion
-  calc
-    ∑ i, (∑ j, W i j * v j) * w i = ∑ i, ∑ j, W i j * v j * w i := expand_lhs
-    _ = ∑ j, ∑ i, W i j * v j * w i := by rw [Finset.sum_comm]
-    _ = ∑ j, ∑ i, W i j * w i * v j := by
-        apply Finset.sum_congr rfl
-        intro j _
-        apply Finset.sum_congr rfl
-        intro i _
-        ring
   sorry
-
-
-lemma dotProduct_eq_apply_symm_toMatrix₂' (v w : Fin n → ℝ) (W : Matrix (Fin n) (Fin n) ℝ) :
-  dotProduct (W.mulVec v) w = (((LinearMap.toMatrix₂' ℝ).symm W) v) w := by
-  -- Use the previous lemma
-  exact LinearMap.toMatrix₂'_symm_apply W v w
+-/

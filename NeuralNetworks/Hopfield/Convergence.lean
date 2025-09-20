@@ -274,7 +274,7 @@ which is impossible.
 -/
 def energy_wf {n : ℕ} (net : HopfieldNetwork n) : WellFounded (energy_order net) := by
   have fin : Fintype (HopfieldState n) := inferInstance
-  rw [WellFounded.wellFounded_iff_no_descending_seq]
+  rw [wellFounded_iff_isEmpty_descending_chain]
   apply IsEmpty.mk
   intro ⟨f, hf⟩
   exact no_infinite_descending_chain net ⟨f, hf⟩
