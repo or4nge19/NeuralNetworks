@@ -7,6 +7,11 @@ on:
     paths:
       - 'lean-toolchain'
 
+permissions:
+  contents: write  # Required to create releases and push tags
+  pages: write     # Required for GitHub Pages
+  id-token: write  # Required for OIDC
+
 jobs:
   create_release:
     runs-on: ubuntu-latest
@@ -45,6 +50,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a ${{ env.tag_name }} -m "Release ${{ env.tag_name }}"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin ${{ env.tag_name }}
 
       - name: Create GitHub Release
