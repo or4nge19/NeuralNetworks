@@ -714,7 +714,7 @@ lemma eval_neuronUpdate_correct :
 end Examples
 
 /-!
-# Refactor Scaffold (Responding to Peer Review)
+# Refactor TODO
 
 Goal: Separate (1) pure architecture (graph + interface sets) from
 (2) dynamics (update rules / parameter typing) and (3) semantic layers
@@ -812,7 +812,6 @@ def isFixed
 end NeuralDyn
 
 /-!
-Action Items (traceability to review):
 1. Monolithic reduction: `NeuralArch.Architecture` + `NeuralDyn.Dynamics`.
 2. Future: probabilistic variant: replace `σ` with `PMF σ` or `StateM τ σ`.
 3. Linear algebra bridge: introduce `(U → R)` as `Module R _` via `Fintype` and derive a
@@ -822,7 +821,7 @@ Action Items (traceability to review):
 -/
 
 /-!
-## Linear Algebra Bridge (addresses review point: connect `Matrix` → `LinearMap`)
+## Linear Algebra Bridge
 
 Prereqs:
 * `U` finite.
@@ -897,9 +896,8 @@ lemma iterate_matches_matrix_pow
 end NeuralNetwork.Linear
 
 /-!
-## Architectural / Dynamics Further Abstractions (actionable skeleton)
+## Architectural / Dynamics Further Abstractions
 
-These address review requests:
 * Factor architecture vs dynamics vs invariants.
 * Provide a probability / monadic hook.
 * Prepare for deep embedding + differentiation.
@@ -968,8 +966,7 @@ open scoped BigOperators
 universe u v
 variable {U : Type u} [Quiver U]
 
-/-! ## Foundational Theorems Justifying the Quiver Refactor
-
+/-!
 These theorems isolate: (1) local recursive law, (2) uniqueness of linear
 solutions on layered DAGs, forming the bedrock for path‑based / pruning /
 gradient results already present (`arborescent_linear_eval_unique`,
