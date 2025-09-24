@@ -674,7 +674,7 @@ theorem computeFlatIndex_functional_correctness
 
 /-
 Status:
-The formalization has now achieved SOTA status for the tensor infrastructure. We have rigorously proven:
+We have rigorously proven:
 1. Memory Safety: Bounds checking, alignment, and positive dimensions (via `computeFlatIndex_bounds` and `LayoutBuilder` invariants).
 2. Structural Integrity: Initialization safety (via `ProvenTensorView`).
 3. Functional Correctness: The indexing implementation correctly adheres to the mathematical row-major specification (via `computeFlatIndex_functional_correctness`).
