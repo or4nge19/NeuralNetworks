@@ -13,3 +13,9 @@ import NeuralNetworks.LLM.GPT2.Model
 import NeuralNetworks.LLM.GPT2.TensorView.Defs
 import NeuralNetworks.LLM.GPT2.TensorView.ComputeBounds
 import NeuralNetworks.LLM.GPT2.TensorView.Lemmas
+
+import Optlib.Algorithm
+import Optlib.Convex
+import Optlib.Differential
+import Optlib.Function
+import Optlib.Optimality

@@ -12,3 +12,6 @@ git = "https://github.com/leanprover-community/mathlib4.git"
 
 [[lean_lib]]
 name = "NeuralNetworks"
+
+[[lean_lib]]
+name = "Optlib"
