@@ -1,6 +1,3 @@
-This formalization provides a state-of-the-art (SOTA) minimal implementation of the SciLean mathematical core, strictly adhering to the mathlib philosophy. It emphasizes mathematical rigor, optimal generality (by incorporating the exponential map and generalized adjoint spaces), and seamless integration with mathlib's analysis libraries.
-
-```lean
 import Mathlib.Analysis.Calculus.ContDiff
 import Mathlib.Analysis.Calculus.FDeriv.Basic
 import Mathlib.Analysis.InnerProductSpace.Basic
