@@ -3949,42 +3949,85 @@ lemma abs_le_of_pre_abs_bound (d : CReal.Pre) {r : ℚ}
   change sup ⟦d⟧ (-⟦d⟧) ≤ (r : CReal)
   exact sup_le h1 h2
 
-theorem converges_to_lim (s : CReal.RCauSeq) (k : ℕ) :
-    ∀ n ≥ k+2, |s.seq n - CReal.lim s| ≤ ((1 : ℚ) / (2 : ℚ) ^ k : CReal) := by
-  intro n hn
-  have hseq : s.seq n = ⟦s.pre n⟧ := s.seq_spec' n
-  have hlim : CReal.lim s = ⟦CReal.lim_pre s⟧ := rfl
-  let d : CReal.Pre := CReal.Pre.add (s.pre n) (CReal.Pre.neg (CReal.lim_pre s))
+lemma min_tail_split (j n : ℕ) :
+  (1 : ℚ) / 2 ^ (min j (n + 1)) ≤ (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+  cases le_total j (n + 1) with
+  | inl h =>
+      have hnn : 0 ≤ (1 : ℚ) / 2 ^ (n + 1) := by positivity
+      have this : (1 : ℚ) / 2 ^ j ≤ (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+        exact le_add_of_nonneg_right hnn
+      simp [min_eq_left h]
+  | inr h =>
+      have hnn : 0 ≤ (1 : ℚ) / 2 ^ j := by positivity
+      have this : (1 : ℚ) / 2 ^ (n + 1) ≤ (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+        exact le_add_of_nonneg_left hnn
+      simp [min_eq_right h]
+
+lemma lift_sync_bound_with_uniform_tail
+  (d : CReal.Pre) (n : ℕ) {r : ℚ}
+  (h_sync : |d.approx (n + 1)| ≤ r) :
+  ∀ j, |d.approx (j + 1)| ≤ r + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+  intro j
+  have h_base :=
+    CReal.lift_sync_bound_to_all_indices (d := d) (K := n + 1) (r := r) (by simpa using h_sync) j
+  have h_tail := min_tail_split j n
+  have h_mono := add_le_add_right h_tail r
+  calc |d.approx (j + 1)|
+    ≤ r + (1 : ℚ) / 2 ^ (min j (n + 1)) := h_base
+    _ ≤ r + ((1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1)) := by gcongr
+    _ = r + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by ring
+
+lemma diff_sync_bound_for_d (s : CReal.RCauSeq) (n : ℕ) (hn : 2 ≤ n) :
+  |((CReal.Pre.add (s.pre n) (CReal.Pre.neg (CReal.lim_pre s))).approx (n + 1))| ≤ (1 : ℚ) / 2 ^ (n - 2) := by
+  let d := CReal.Pre.add (s.pre n) (CReal.Pre.neg (CReal.lim_pre s))
   have hJ :
     d.approx (n + 1)
       = (s.pre n).approx (n + 2) - (CReal.lim_pre s).approx (n + 2) := by
     dsimp [d, CReal.Pre.add, CReal.Pre.neg]; ring
-  have hn2 : 2 ≤ n := by
-    exact Nat.le_of_add_left_le hn
-  have h_sync :
-      |d.approx (n + 1)| ≤ (1 : ℚ) / 2 ^ (n - 2) := by
-    simpa [hJ] using CReal.diff_at_sync_bound s n hn2
+  have hlim : (CReal.lim_pre s).approx (n + 2) = (s.pre (n + 4)).approx (n + 4) := by
+    simp [lim_pre_approx_simp]
+  rw [hJ, hlim]
+  exact CReal.diff_at_sync_bound s n hn
+
+lemma all_indices_bound_from_sync
+  (d : CReal.Pre) (n k : ℕ)
+  (_ : 2 ≤ n)
+  (h_sync : |d.approx (n + 1)| ≤ (1 : ℚ) / 2 ^ (n - 2))
+  (hk : k ≤ n - 2) :
+  ∀ j, |d.approx (j + 1)| ≤ (1 : ℚ) / 2 ^ k + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+  intro j
   have h_all_sync :
-      ∀ j, |d.approx (j + 1)| ≤ (1 : ℚ) / (2 : ℚ) ^ (n - 2) + 1 / (2 : ℚ) ^ j :=
-    CReal.lift_sync_bound_to_all_indices d h_sync
-  have hk_le : k ≤ n - 2 := Nat.le_sub_of_add_le hn
+      |d.approx (j + 1)| ≤ (1 : ℚ) / 2 ^ (n - 2) + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) :=
+    lift_sync_bound_with_uniform_tail d n (r := (1 : ℚ) / 2 ^ (n - 2)) (by simpa using h_sync) j
   have hmono :
-      (1 : ℚ) / (2 : ℚ) ^ (n - 2) ≤ (1 : ℚ) / (2 : ℚ) ^ k := by
-    have hpow_le : (2 : ℚ) ^ k ≤ (2 : ℚ) ^ (n - 2) :=
-        (pow_le_pow_iff_right₀ (by norm_num : (1 : ℚ) < 2)).mpr hk_le
-    exact one_div_le_one_div_of_le (pow_pos (by norm_num) _) hpow_le
-  have h_all :
-      ∀ j, |d.approx (j + 1)| ≤ (1 : ℚ) / (2 : ℚ) ^ k + 1 / (2 : ℚ) ^ j := by
+      (1 : ℚ) / 2 ^ (n - 2) ≤ (1 : ℚ) / 2 ^ k :=
+    one_div_pow_le_one_div_pow_of_le rfl hk
+  have h_stronger :
+      (1 : ℚ) / 2 ^ (n - 2) + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1)
+        ≤ (1 : ℚ) / 2 ^ k + (1 : ℚ) / 2 ^ j + (1 : ℚ) / 2 ^ (n + 1) := by
+    have := add_le_add_right (add_le_add_right hmono ((1 : ℚ) / 2 ^ j)) ((1 : ℚ) / 2 ^ (n + 1))
+    simpa [add_comm, add_left_comm, add_assoc] using this
+  exact h_all_sync.trans h_stronger
+
+theorem converges_to_lim (s : CReal.RCauSeq) (k : ℕ) :
+    ∀ n ≥ k+2, |s.seq n - CReal.lim s| ≤ ((((1 : ℚ) / (2 : ℚ) ^ k) + ((1 : ℚ) / (2 : ℚ) ^ (n + 1))) : CReal) := by
+  intro n hn
+  have hseq : s.seq n = ⟦s.pre n⟧ := s.seq_spec' n
+  have hlim : CReal.lim s = ⟦CReal.lim_pre s⟧ := rfl
+  let d : CReal.Pre := CReal.Pre.add (s.pre n) (CReal.Pre.neg (CReal.lim_pre s))
+  have hn2 : 2 ≤ n := Nat.le_of_add_left_le hn
+  have h_sync : |d.approx (n + 1)| ≤ (1 : ℚ) / 2 ^ (n - 2) :=
+    diff_sync_bound_for_d s n hn2
+  have hk_le : k ≤ n - 2 := Nat.le_sub_of_add_le hn
+  have hall_with_tail :
+    ∀ j, |d.approx (j + 1)| ≤ (1 : ℚ) / (2 : ℚ) ^ k + 1 / (2 : ℚ) ^ j + 1 / 2 ^ (n + 1) :=
+    all_indices_bound_from_sync d n k hn2 h_sync hk_le
+  have hall' :
+    ∀ j, |d.approx (j + 1)| ≤ ((1 : ℚ) / (2 : ℚ) ^ k + (1 : ℚ) / (2 : ℚ) ^ (n + 1)) + 1 / (2 : ℚ) ^ j := by
     intro j
-    have h := h_all_sync j
-    have := add_le_add_right hmono (1 / (2 : ℚ) ^ j)
-    exact h.trans this
-  have h_abs :
-      |(⟦d⟧ : CReal)| ≤ ((1 : ℚ) / (2 : ℚ) ^ k : CReal) := by
-    simpa using (CReal.abs_le_of_pre_abs_bound d h_all)
-  simp_all only [ge_iff_le, RCauSeq.seq_spec', lim_pre_approx_simp, one_div, d]
-  exact h_abs
+    simpa [add_comm, add_left_comm, add_assoc] using (hall_with_tail j)
+  have h_abs : |(⟦d⟧ : CReal)| ≤ ((((1 : ℚ) / (2 : ℚ) ^ k) + ((1 : ℚ) / (2 : ℚ) ^ (n + 1))) : CReal) :=
+    by simpa using (CReal.abs_le_of_pre_abs_bound d hall')
+  simpa [hseq, hlim, d, CReal.Pre.add, CReal.Pre.neg, sub_eq_add_neg] using h_abs
 
 end CReal
-
-#min_imports
