@@ -2,7 +2,7 @@
 
 This project contains Lean 4 formalizations of concepts related to neural networks and associated mathematical structures.
 
-### A more up-to-date development of the Hopfield network material is at https://github.com/mkaratarakis/HopfieldNet ###
+### A more up-to-date development of the Hopfield network material is at [https://github.com/mkaratarakis/HopfieldNet](https://github.com/or4nge19/HopfieldNet2) ###
 
 ### Project Structure
 
